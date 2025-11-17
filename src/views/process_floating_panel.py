@@ -1,0 +1,790 @@
+"""
+Process Floating Panel - Displays all items and lists from a process
+"""
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                              QScrollArea, QPushButton, QMessageBox)
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent, QTimer
+from PyQt6.QtGui import QFont, QCursor
+import sys
+import logging
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from models.process import Process
+from models.item import Item
+from views.widgets.item_widget import ItemButton
+from views.widgets.list_widget import ListWidget
+from views.widgets.search_bar import SearchBar
+from styles.futuristic_theme import get_theme
+
+# Get logger
+logger = logging.getLogger(__name__)
+
+
+class ProcessFloatingPanel(QWidget):
+    """Floating panel to display all items and lists from a process"""
+
+    # Signals
+    item_clicked = pyqtSignal(object)  # Item object
+    window_closed = pyqtSignal()
+    pin_state_changed = pyqtSignal(bool)  # True = pinned, False = unpinned
+    process_executed = pyqtSignal(int)  # Process ID when executing all steps
+    customization_requested = pyqtSignal()
+
+    def __init__(self, process_controller, config_manager, parent=None, main_window=None):
+        super().__init__(parent)
+        self.current_process = None
+        self.process_controller = process_controller
+        self.config_manager = config_manager
+        self.main_window = main_window
+
+        # Panel state
+        self.is_pinned = False
+        self.is_minimized = False
+        self.normal_height = None
+        self.normal_width = None
+
+        # Items and lists from process
+        self.all_items = []
+        self.all_lists = []
+        self.all_steps = []  # Store all steps for filtering
+
+        # Search state
+        self.search_query = ""
+
+        # Theme
+        self.theme = get_theme()
+
+        # Get panel width from config
+        if config_manager:
+            self.panel_width = config_manager.get_setting('panel_width', 500)
+        else:
+            self.panel_width = 500
+
+        # Resize handling
+        self.resizing = False
+        self.resize_start_x = 0
+        self.resize_start_width = 0
+        self.resize_edge_width = 15
+
+        # Panel persistence attributes
+        self.panel_id = None  # ID del panel en la base de datos (None si no está guardado)
+
+        # AUTO-UPDATE: Timer for debounced panel state updates
+        self.update_timer = QTimer(self)
+        self.update_timer.setSingleShot(True)
+        self.update_timer.timeout.connect(self._save_panel_state_to_db)
+        self.update_delay_ms = 1000  # 1 second delay after move/resize
+
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize the floating panel UI"""
+        # Window properties
+        self.setWindowTitle("Proceso - Items y Listas")
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.FramelessWindowHint
+        )
+
+        # Calculate window height: 80% of screen height (same as other panels)
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_height = screen.availableGeometry().height()
+            window_height = int(screen_height * 0.8)
+        else:
+            window_height = 600
+
+        # Set window size
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(1000)
+        self.setMinimumHeight(400)
+        self.resize(self.panel_width, window_height)
+
+        # Enable mouse tracking for resize cursor
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+        # Set window opacity
+        self.setWindowOpacity(0.95)
+
+        # Set background with border
+        self.setStyleSheet(f"""
+            ProcessFloatingPanel {{
+                background-color: {self.theme.get_color('background_deep')};
+                border: 2px solid #ff8800;
+                border-left: 5px solid #ff8800;
+                border-radius: 12px;
+            }}
+        """)
+
+        # Main layout
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Header
+        self.header_widget = self.create_header()
+        main_layout.addWidget(self.header_widget)
+
+        # Action bar (below header)
+        self.action_bar = self.create_action_bar()
+        main_layout.addWidget(self.action_bar)
+
+        # Content area (scrollable)
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        self.content_layout.setSpacing(10)
+        self.content_layout.addStretch()
+
+        # Scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(self.content_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background-color: #2d2d2d;
+                width: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #00ff88;
+                border-radius: 6px;
+                min-height: 20px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        main_layout.addWidget(scroll_area)
+
+    def create_header(self):
+        """Create header with title and control buttons"""
+        header = QWidget()
+        header.setFixedHeight(60)
+        header.setStyleSheet("""
+            QWidget {
+                background-color: #007acc;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+            }
+        """)
+
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
+
+        # "PROCESOS" label
+        title_label = QLabel("PROCESOS")
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 12pt;
+                font-weight: bold;
+                background-color: transparent;
+            }
+        """)
+        layout.addWidget(title_label)
+
+        # Process name label (with orange background)
+        self.process_name_label = QLabel()
+        self.process_name_label.setStyleSheet("""
+            QLabel {
+                background-color: #ff8800;
+                color: #000000;
+                font-size: 11pt;
+                font-weight: bold;
+                padding: 8px 15px;
+                border-radius: 15px;
+            }
+        """)
+        self.process_name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.process_name_label)
+
+        layout.addStretch()
+
+        # "Copiar Todos" button (checkable)
+        self.copy_all_button = QPushButton("📋 Copiar Todos")
+        self.copy_all_button.setCheckable(True)
+        self.copy_all_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.copy_all_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 9pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #00ff88;
+                color: #000000;
+                border-color: #00ff88;
+            }
+            QPushButton:checked {
+                background-color: #00ff88;
+                color: #000000;
+            }
+        """)
+        self.copy_all_button.clicked.connect(self.on_copy_all_clicked)
+        layout.addWidget(self.copy_all_button)
+
+        # Edit/Config button
+        edit_button = QPushButton("⚙️")
+        edit_button.setFixedSize(30, 30)
+        edit_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        edit_button.setToolTip("Editar proceso")
+        edit_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 14pt;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+        """)
+        edit_button.clicked.connect(self.on_edit_process_clicked)
+        layout.addWidget(edit_button)
+
+        # Pin button
+        self.pin_button = QPushButton("📍")
+        self.pin_button.setFixedSize(30, 30)
+        self.pin_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.pin_button.setToolTip("Anclar panel")
+        self.pin_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 14pt;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+        """)
+        self.pin_button.clicked.connect(self.on_pin_clicked)
+        layout.addWidget(self.pin_button)
+
+        # Minimize button (only visible when pinned)
+        self.minimize_button = QPushButton("−")
+        self.minimize_button.setFixedSize(30, 30)
+        self.minimize_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.minimize_button.setToolTip("Minimizar")
+        self.minimize_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 14pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+        """)
+        self.minimize_button.clicked.connect(self.on_minimize_clicked)
+        self.minimize_button.setVisible(False)
+        layout.addWidget(self.minimize_button)
+
+        # Close button
+        close_button = QPushButton("✕")
+        close_button.setFixedSize(30, 30)
+        close_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        close_button.setToolTip("Cerrar")
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 14pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e4475b;
+                border-radius: 4px;
+            }
+        """)
+        close_button.clicked.connect(self.close)
+        layout.addWidget(close_button)
+
+        return header
+
+    def create_action_bar(self):
+        """Create action bar below header"""
+        action_bar = QWidget()
+        action_bar.setFixedHeight(50)
+        action_bar.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                border-bottom: 1px solid #3d3d3d;
+            }
+        """)
+
+        layout = QHBoxLayout(action_bar)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
+
+        # Steps counter label
+        self.steps_label = QLabel("0 pasos")
+        self.steps_label.setStyleSheet("""
+            QLabel {
+                color: #00ff88;
+                font-size: 9pt;
+                font-weight: bold;
+                background-color: transparent;
+            }
+        """)
+        layout.addWidget(self.steps_label)
+
+        # Search bar
+        self.search_bar = SearchBar(placeholder="Buscar en pasos...")
+        self.search_bar.setFixedWidth(250)
+        self.search_bar.search_changed.connect(self.on_search_changed)
+        layout.addWidget(self.search_bar)
+
+        layout.addStretch()
+
+        return action_bar
+
+    def load_process(self, process: Process):
+        """Load process and all its items/lists"""
+        try:
+            logger.info(f"Loading process: {process.name} (ID: {process.id})")
+            self.current_process = process
+
+            # Update header
+            self.process_name_label.setText(process.name)
+
+            # Get all steps
+            steps = self.process_controller.get_process_steps(process.id)
+            logger.info(f"Found {len(steps)} steps")
+
+            # Store all steps for filtering
+            self.all_steps = steps
+
+            # Update steps counter
+            self.steps_label.setText(f"{len(steps)} paso{'s' if len(steps) != 1 else ''}")
+
+            # Clear existing content
+            self.clear_content()
+
+            # Extract and display items/lists from steps
+            self.all_items = []
+            self.all_lists = []
+
+            # Display steps (apply current search if any)
+            self.apply_search_filter()
+
+            # Show panel
+            self.show()
+
+        except Exception as e:
+            logger.error(f"Error loading process: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al cargar proceso:\n{str(e)}"
+            )
+
+    def display_step(self, step):
+        """Display a single step with its item or list"""
+        # Create step container
+        step_widget = QWidget()
+        step_layout = QVBoxLayout(step_widget)
+        step_layout.setContentsMargins(0, 0, 0, 10)
+        step_layout.setSpacing(5)
+
+        # Step header
+        step_header = QLabel(f"Paso {step.step_order + 1}")
+        step_header.setStyleSheet("""
+            QLabel {
+                color: #00ff88;
+                font-size: 10pt;
+                font-weight: bold;
+                padding: 5px;
+                border-bottom: 1px solid #3d3d3d;
+                background-color: transparent;
+            }
+        """)
+        step_layout.addWidget(step_header)
+
+        # Display item for this step
+        if step.item_id:
+            item_dict = self.config_manager.db.get_item(step.item_id)
+            if item_dict:
+                # Convert dict to Item object
+                item = Item.from_dict(item_dict)
+                self.all_items.append(item)
+                item_widget = ItemButton(item, self)
+                item_widget.item_clicked.connect(lambda i=item: self.on_item_clicked(i))
+                step_layout.addWidget(item_widget)
+            else:
+                logger.warning(f"Item {step.item_id} not found for step {step.id}")
+
+        # Add to main content
+        self.content_layout.insertWidget(self.content_layout.count() - 1, step_widget)
+
+    def clear_content(self):
+        """Clear all content widgets"""
+        while self.content_layout.count() > 1:  # Keep the stretch
+            item = self.content_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self.all_items = []
+        self.all_lists = []
+
+    def on_item_clicked(self, item: Item):
+        """Handle item click"""
+        logger.info(f"Item clicked: {item.label}")
+        self.item_clicked.emit(item)
+
+    def on_copy_all_clicked(self, checked: bool):
+        """Copy all items from the process to clipboard"""
+        if not self.current_process:
+            return
+
+        try:
+            logger.info(f"Executing process: {self.current_process.name}")
+
+            # Execute process (copy all steps)
+            success = self.process_controller.executor.execute_process(self.current_process.id)
+
+            if success:
+                logger.info("Process executed successfully")
+                # Show visual feedback
+                QMessageBox.information(
+                    self,
+                    "Éxito",
+                    f"✓ Proceso '{self.current_process.name}' ejecutado\nTodo copiado al portapapeles"
+                )
+                # Emit signal
+                self.process_executed.emit(self.current_process.id)
+            else:
+                logger.error("Process execution failed")
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"✗ Error al ejecutar proceso '{self.current_process.name}'"
+                )
+
+        except Exception as e:
+            logger.error(f"Exception executing process: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al ejecutar proceso:\n{str(e)}"
+            )
+        finally:
+            # Uncheck button
+            self.copy_all_button.setChecked(False)
+
+    def on_pin_clicked(self):
+        """Toggle pin state"""
+        self.is_pinned = not self.is_pinned
+
+        # Update button icon and tooltip
+        if self.is_pinned:
+            self.pin_button.setText("📌")
+            self.pin_button.setToolTip("Desanclar panel")
+            # Update header color
+            self.header_widget.setStyleSheet("""
+                QWidget {
+                    background-color: #ff8800;
+                    border-top-left-radius: 10px;
+                    border-top-right-radius: 10px;
+                }
+            """)
+            # Show minimize button
+            self.minimize_button.setVisible(True)
+        else:
+            self.pin_button.setText("📍")
+            self.pin_button.setToolTip("Anclar panel")
+            # Restore header color
+            self.header_widget.setStyleSheet("""
+                QWidget {
+                    background-color: #007acc;
+                    border-top-left-radius: 10px;
+                    border-top-right-radius: 10px;
+                }
+            """)
+            # Hide minimize button
+            self.minimize_button.setVisible(False)
+            # Restore if minimized
+            if self.is_minimized:
+                self.on_minimize_clicked()
+
+        # Emit signal
+        self.pin_state_changed.emit(self.is_pinned)
+
+        logger.info(f"Panel pin state: {self.is_pinned}")
+
+        # Save to database if pinned, delete if unpinned
+        if self.is_pinned:
+            self.schedule_panel_update()
+        else:
+            self.delete_from_database()
+
+    def on_minimize_clicked(self):
+        """Toggle minimize state (only if pinned)"""
+        if not self.is_pinned:
+            return
+
+        self.is_minimized = not self.is_minimized
+
+        if self.is_minimized:
+            # Save current size
+            self.normal_height = self.height()
+            self.normal_width = self.width()
+
+            # Minimize to header only
+            self.content_widget.hide()
+            self.action_bar.hide()
+            self.setFixedHeight(60)
+            self.minimize_button.setText("□")
+            self.minimize_button.setToolTip("Restaurar")
+        else:
+            # Restore size
+            self.content_widget.show()
+            self.action_bar.show()
+            self.setMinimumHeight(400)
+            if self.normal_height:
+                self.resize(self.normal_width, self.normal_height)
+            self.minimize_button.setText("−")
+            self.minimize_button.setToolTip("Minimizar")
+
+        logger.info(f"Panel minimized: {self.is_minimized}")
+
+        # Save state change to database
+        self.schedule_panel_update()
+
+    def on_edit_process_clicked(self):
+        """Open ProcessBuilderWindow to edit current process"""
+        if not self.current_process:
+            return
+
+        try:
+            logger.info(f"Editing process: {self.current_process.name}")
+
+            # Import ProcessBuilderWindow
+            from views.process_builder_window import ProcessBuilderWindow
+
+            # Create and show edit window
+            edit_window = ProcessBuilderWindow(
+                process_controller=self.process_controller,
+                config_manager=self.config_manager,
+                parent=self.main_window,
+                process_to_edit=self.current_process
+            )
+
+            # Connect save signal to reload panel
+            edit_window.process_saved.connect(self.on_process_edited)
+
+            # Show window
+            edit_window.show()
+
+        except Exception as e:
+            logger.error(f"Error opening process editor: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir editor de proceso:\n{str(e)}"
+            )
+
+    def on_process_edited(self, process_id: int):
+        """Handle process edited - reload panel"""
+        try:
+            logger.info(f"Process {process_id} was edited, reloading panel")
+
+            # Get updated process
+            process = self.process_controller.get_process(process_id)
+            if process:
+                # Reload panel with updated process
+                self.load_process(process)
+            else:
+                logger.warning(f"Process {process_id} not found after edit")
+
+        except Exception as e:
+            logger.error(f"Error reloading process after edit: {e}", exc_info=True)
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        logger.info("Process panel closing")
+        self.window_closed.emit()
+        event.accept()
+
+    # Search functionality
+    def on_search_changed(self, query: str):
+        """Handle search query change"""
+        self.search_query = query.lower().strip()
+        logger.info(f"Search query changed: '{self.search_query}'")
+        self.apply_search_filter()
+
+    def apply_search_filter(self):
+        """Apply search filter to steps"""
+        # Clear current content
+        while self.content_layout.count() > 1:  # Keep the stretch
+            item = self.content_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self.all_items = []
+        self.all_lists = []
+
+        # If no search query, show all steps
+        if not self.search_query:
+            for step in self.all_steps:
+                self.display_step(step)
+            return
+
+        # Filter steps based on search query
+        for step in self.all_steps:
+            if self.step_matches_search(step):
+                self.display_step(step)
+
+    def step_matches_search(self, step) -> bool:
+        """Check if step matches search query"""
+        if not self.search_query:
+            return True
+
+        # Search in step group name
+        if step.group_name and self.search_query in step.group_name.lower():
+            return True
+
+        # Search in custom label
+        if step.custom_label and self.search_query in step.custom_label.lower():
+            return True
+
+        # Search in item if this step has an item
+        if step.item_id:
+            item_dict = self.config_manager.db.get_item(step.item_id)
+            if item_dict:
+                # Search in item label (dict access)
+                if item_dict.get('label') and self.search_query in item_dict.get('label', '').lower():
+                    return True
+                # Search in item content (dict access)
+                if item_dict.get('content') and self.search_query in item_dict.get('content', '').lower():
+                    return True
+
+        return False
+
+    # Panel persistence methods
+    def _save_panel_state_to_db(self):
+        """Save panel state to database (called after debounce timer)"""
+        if not self.is_pinned or not self.current_process:
+            return
+
+        try:
+            if self.panel_id:
+                # Update existing panel
+                self.config_manager.db.update_pinned_process_panel(
+                    self.panel_id,
+                    x_position=self.x(),
+                    y_position=self.y(),
+                    width=self.width(),
+                    height=self.height(),
+                    is_minimized=self.is_minimized
+                )
+                logger.debug(f"Process panel state updated in DB: {self.panel_id}")
+            else:
+                # Create new panel entry
+                self.panel_id = self.config_manager.db.save_pinned_process_panel(
+                    process_id=self.current_process.id,
+                    x_pos=self.x(),
+                    y_pos=self.y(),
+                    width=self.width(),
+                    height=self.height(),
+                    is_minimized=self.is_minimized
+                )
+                logger.info(f"Process panel saved to DB with ID: {self.panel_id}")
+
+        except Exception as e:
+            logger.error(f"Error saving process panel state: {e}", exc_info=True)
+
+    def schedule_panel_update(self):
+        """Schedule a debounced panel state update"""
+        if not self.is_pinned:
+            return
+        self.update_timer.start(self.update_delay_ms)
+
+    def delete_from_database(self):
+        """Delete panel from database"""
+        if self.panel_id:
+            try:
+                self.config_manager.db.delete_pinned_process_panel(self.panel_id)
+                logger.info(f"Process panel {self.panel_id} deleted from database")
+                self.panel_id = None
+            except Exception as e:
+                logger.error(f"Error deleting process panel from database: {e}", exc_info=True)
+
+    # Mouse events for resize (left edge)
+    def mousePressEvent(self, event):
+        """Handle mouse press for resize"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if event.position().x() <= self.resize_edge_width:
+                self.resizing = True
+                self.resize_start_x = event.globalPosition().x()
+                self.resize_start_width = self.width()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move for resize cursor and resizing"""
+        # Update cursor based on position
+        if event.position().x() <= self.resize_edge_width:
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+        # Handle resizing
+        if self.resizing:
+            delta_x = event.globalPosition().x() - self.resize_start_x
+            new_width = self.resize_start_width - int(delta_x)
+
+            # Clamp width
+            if new_width < self.minimumWidth():
+                new_width = self.minimumWidth()
+            elif new_width > self.maximumWidth():
+                new_width = self.maximumWidth()
+
+            # Update width and position
+            old_x = self.x()
+            old_width = self.width()
+            self.resize(new_width, self.height())
+            # Adjust position to keep right edge in place
+            self.move(old_x + (old_width - new_width), self.y())
+
+            event.accept()
+            return
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release for resize"""
+        if event.button() == Qt.MouseButton.LeftButton and self.resizing:
+            self.resizing = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            # Schedule panel update after resize
+            self.schedule_panel_update()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def moveEvent(self, event):
+        """Handle window move - schedule panel state update"""
+        super().moveEvent(event)
+        self.schedule_panel_update()

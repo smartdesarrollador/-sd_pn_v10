@@ -16,9 +16,17 @@ class SearchBar(QWidget):
 
     search_changed = pyqtSignal(str)  # Emits search query
 
-    def __init__(self, parent=None):
-        """Initialize search bar with debouncing"""
+    def __init__(self, parent=None, placeholder: str = "Buscar items..."):
+        """Initialize search bar with debouncing
+
+        Args:
+            parent: Parent widget
+            placeholder: Placeholder text for search input
+        """
         super().__init__(parent)
+
+        # Store placeholder text
+        self.placeholder_text = placeholder
 
         # Debounce timer (300ms)
         self.debounce_timer = QTimer()
@@ -42,7 +50,7 @@ class SearchBar(QWidget):
 
         # Search input
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar items...")
+        self.search_input.setPlaceholderText(self.placeholder_text)
         self.search_input.setFont(QFont("Segoe UI", 10))
         self.search_input.setFixedHeight(32)
 

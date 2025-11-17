@@ -42,7 +42,8 @@ class MainController:
         self.process_controller = ProcessController(
             self.config_manager.db,
             self.config_manager,
-            self.clipboard_manager
+            self.clipboard_manager,
+            self.list_controller
         )
 
         # Data

@@ -75,6 +75,9 @@ class Sidebar(QWidget):
     # Signal emitted when view processes button is clicked
     view_processes_clicked = pyqtSignal()
 
+    # Signal emitted when a process button is clicked
+    process_clicked = pyqtSignal(int)  # process_id
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.category_buttons = {}
@@ -83,6 +86,10 @@ class Sidebar(QWidget):
         self.theme = get_theme()  # Obtener tema futurista
         self.notebook_window = None  # Reference to notebook window
         self.controller = None  # Will be set later
+
+        # Process buttons
+        self.process_buttons = {}  # Dict: process_id -> ProcessButton
+        self.active_process_button = None
 
         self.init_ui()
 
@@ -539,6 +546,80 @@ class Sidebar(QWidget):
             button.deleteLater()
         self.category_buttons.clear()
         self.active_button = None
+
+    def load_active_processes(self, processes):
+        """Load and create buttons for active processes"""
+        from views.widgets.process_button import ProcessButton
+
+        # Clear existing process buttons
+        self.clear_process_buttons()
+
+        # Filter only active processes
+        active_processes = [p for p in processes if p.is_active]
+
+        # Create button for each active process
+        for process in active_processes:
+            # Get step count for this process
+            step_count = 0
+            if self.controller and self.controller.process_controller:
+                steps = self.controller.process_controller.get_process_steps(process.id)
+                step_count = len(steps)
+
+            button = ProcessButton(process.id, process.name, step_count, self)
+            button.clicked.connect(self.on_process_clicked)
+
+            self.process_buttons[process.id] = button
+            # Insert before the stretch
+            self.buttons_layout.insertWidget(self.buttons_layout.count() - 1, button)
+
+        # Update scroll buttons
+        self.update_scroll_buttons()
+
+    def clear_process_buttons(self):
+        """Clear all process buttons"""
+        for button in self.process_buttons.values():
+            button.deleteLater()
+        self.process_buttons.clear()
+        self.active_process_button = None
+
+    def on_process_clicked(self, process_id: int):
+        """Handle process button click"""
+        # Update active button
+        if self.active_process_button:
+            self.active_process_button.set_active(False)
+
+        clicked_button = self.process_buttons.get(process_id)
+        if clicked_button:
+            clicked_button.set_active(True)
+            self.active_process_button = clicked_button
+
+        # Emit signal
+        self.process_clicked.emit(process_id)
+
+    def refresh_active_processes(self):
+        """Refresh active processes from controller"""
+        if self.controller:
+            processes = self.controller.process_controller.get_all_processes(
+                include_archived=False,
+                include_inactive=False
+            )
+            self.load_active_processes(processes)
+
+    def set_active_process(self, process_id: int):
+        """Set active process programmatically"""
+        if self.active_process_button:
+            self.active_process_button.set_active(False)
+
+        button = self.process_buttons.get(process_id)
+        if button:
+            button.set_active(True)
+            self.active_process_button = button
+
+    def clear_active_process(self):
+        """Clear active process button"""
+        if self.active_process_button:
+            self.active_process_button.set_active(False)
+            self.active_process_button = None
 
     def on_category_clicked(self, category_id: str):
         """Handle category button click"""

@@ -178,6 +178,22 @@ class DBManager:
                 FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
             );
 
+            -- Tabla de paneles anclados de procesos (pinned process panels)
+            CREATE TABLE IF NOT EXISTS pinned_process_panels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                process_id INTEGER NOT NULL,
+                x_position INTEGER NOT NULL,
+                y_position INTEGER NOT NULL,
+                width INTEGER NOT NULL DEFAULT 500,
+                height INTEGER NOT NULL DEFAULT 600,
+                is_minimized BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_opened TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                open_count INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY (process_id) REFERENCES processes(id) ON DELETE CASCADE
+            );
+
             -- Tabla de configuración del navegador embebido
             CREATE TABLE IF NOT EXISTS browser_config (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1511,6 +1527,125 @@ class DBManager:
         query = "UPDATE pinned_panels SET is_active = 0"
         self.execute_update(query)
         logger.info("All pinned panels marked as inactive")
+
+    # ========== PINNED PROCESS PANELS ==========
+
+    def save_pinned_process_panel(self, process_id: int, x_pos: int = 0, y_pos: int = 0,
+                                   width: int = 500, height: int = 600,
+                                   is_minimized: bool = False) -> int:
+        """
+        Save a pinned process panel configuration to database
+
+        Args:
+            process_id: Process ID
+            x_pos: X position on screen
+            y_pos: Y position on screen
+            width: Panel width
+            height: Panel height
+            is_minimized: Whether panel is minimized
+
+        Returns:
+            int: New panel ID
+        """
+        query = """
+            INSERT INTO pinned_process_panels
+            (process_id, x_position, y_position, width, height, is_minimized, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+        """
+        panel_id = self.execute_update(
+            query,
+            (process_id, x_pos, y_pos, width, height, is_minimized)
+        )
+        logger.info(f"Pinned process panel saved: Process={process_id} (ID: {panel_id})")
+        return panel_id
+
+    def get_pinned_process_panels(self, active_only: bool = True) -> List[Dict]:
+        """
+        Retrieve all pinned process panels
+
+        Args:
+            active_only: Only return panels marked as active
+
+        Returns:
+            List[Dict]: List of panel dictionaries with process info
+        """
+        query = """
+            SELECT pp.*, p.name as process_name, p.icon as process_icon
+            FROM pinned_process_panels pp
+            INNER JOIN processes p ON pp.process_id = p.id
+        """
+        if active_only:
+            query += " WHERE pp.is_active = 1"
+
+        query += " ORDER BY pp.last_opened DESC"
+
+        panels = self.execute_query(query)
+        logger.debug(f"Retrieved {len(panels)} pinned process panels")
+        return panels
+
+    def update_pinned_process_panel(self, panel_id: int, **kwargs) -> bool:
+        """
+        Update pinned process panel configuration
+
+        Args:
+            panel_id: Panel ID to update
+            **kwargs: Fields to update (x_position, y_position, width, height, is_minimized)
+
+        Returns:
+            bool: True if update successful
+        """
+        allowed_fields = {'x_position', 'y_position', 'width', 'height', 'is_minimized'}
+        updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
+        if not updates:
+            return False
+
+        set_clause = ', '.join(f"{k} = ?" for k in updates.keys())
+        query = f"UPDATE pinned_process_panels SET {set_clause} WHERE id = ?"
+        params = list(updates.values()) + [panel_id]
+
+        self.execute_update(query, tuple(params))
+        logger.info(f"Pinned process panel updated: ID {panel_id}")
+        return True
+
+    def update_process_panel_last_opened(self, panel_id: int) -> None:
+        """
+        Update last_opened timestamp and increment open_count
+
+        Args:
+            panel_id: Panel ID
+        """
+        query = """
+            UPDATE pinned_process_panels
+            SET last_opened = CURRENT_TIMESTAMP,
+                open_count = open_count + 1
+            WHERE id = ?
+        """
+        self.execute_update(query, (panel_id,))
+        logger.debug(f"Process panel {panel_id} opened - statistics updated")
+
+    def delete_pinned_process_panel(self, panel_id: int) -> bool:
+        """
+        Remove a pinned process panel from database
+
+        Args:
+            panel_id: Panel ID to delete
+
+        Returns:
+            bool: True if deletion successful
+        """
+        query = "DELETE FROM pinned_process_panels WHERE id = ?"
+        self.execute_update(query, (panel_id,))
+        logger.info(f"Pinned process panel deleted: ID {panel_id}")
+        return True
+
+    def deactivate_all_process_panels(self) -> None:
+        """
+        Set is_active=0 for all process panels (called on app shutdown)
+        """
+        query = "UPDATE pinned_process_panels SET is_active = 0"
+        self.execute_update(query)
+        logger.info("All pinned process panels marked as inactive")
 
     def get_panel_by_category(self, category_id: int) -> Optional[Dict]:
         """

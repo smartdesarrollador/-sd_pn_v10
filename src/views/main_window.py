@@ -83,6 +83,12 @@ class MainWindow(QMainWindow):
         self.structure_dashboard = None  # Dashboard de estructura (no-modal)
         self.category_filter_window = None  # Ventana de filtros de categorías
         self.current_category_id = None  # Para el toggle
+
+        # Process panels
+        self.current_process_panel = None  # Panel flotante activo (no anclado) para procesos
+        self.pinned_process_panels = []  # Lista de paneles de procesos anclados
+        self.current_process_id = None  # Para el toggle de procesos
+
         self.hotkey_manager = None
         self.tray_manager = None
         self.notification_manager = NotificationManager()
@@ -110,6 +116,13 @@ class MainWindow(QMainWindow):
         # AUTO-RESTORE: Restore pinned panels from database on startup
         self.restore_pinned_panels_on_startup()
         self.restore_pinned_global_search_panels()
+        self.restore_pinned_process_panels()
+
+        # Connect process state change signal for auto-refresh
+        if self.controller and self.controller.process_controller:
+            self.controller.process_controller.process_state_changed.connect(
+                self.on_process_state_changed
+            )
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -209,12 +222,22 @@ class MainWindow(QMainWindow):
         self.sidebar.pinned_panels_manager_clicked.connect(self.show_pinned_panels_manager)
         self.sidebar.create_process_clicked.connect(self.on_create_process_clicked)
         self.sidebar.view_processes_clicked.connect(self.on_view_processes_clicked)
+        self.sidebar.process_clicked.connect(self.on_process_clicked)
         main_layout.addWidget(self.sidebar)
 
     def load_categories(self, categories):
         """Load categories into sidebar"""
         if self.sidebar:
             self.sidebar.load_categories(categories)
+
+    def load_processes_to_sidebar(self):
+        """Load active processes into sidebar"""
+        if self.controller and self.sidebar:
+            processes = self.controller.process_controller.get_all_processes(
+                include_archived=False,
+                include_inactive=False
+            )
+            self.sidebar.load_active_processes(processes)
 
     def on_category_clicked(self, category_id: str):
         """Handle category button click - toggle floating panel"""
@@ -1234,6 +1257,116 @@ class MainWindow(QMainWindow):
                 f"Error al abrir panel de procesos:\n{str(e)}"
             )
 
+    def on_process_clicked(self, process_id: int):
+        """Handle process button click from sidebar - show floating panel for specific process"""
+        try:
+            logger.info(f"Process button clicked: {process_id}")
+
+            # Toggle: if same process and panel not pinned, hide it
+            if (self.current_process_id == process_id and
+                self.current_process_panel and
+                self.current_process_panel.isVisible() and
+                not self.current_process_panel.is_pinned):
+                logger.info(f"Toggling off - hiding process panel: {process_id}")
+                self.current_process_panel.hide()
+                self.current_process_id = None
+                return
+
+            # Get process from controller
+            if not self.controller or not self.controller.process_controller:
+                logger.error("ProcessController not available")
+                return
+
+            process = self.controller.process_controller.get_process(process_id)
+
+            if not process:
+                logger.warning(f"Process {process_id} not found")
+                return
+
+            logger.info(f"Process found: {process.name}")
+
+            # If current panel is pinned, add to pinned list
+            if self.current_process_panel and self.current_process_panel.is_pinned:
+                logger.info("Current process panel is pinned, adding to pinned_process_panels list")
+                if self.current_process_panel not in self.pinned_process_panels:
+                    self.pinned_process_panels.append(self.current_process_panel)
+                self.current_process_panel = None
+
+            # Create new panel if needed
+            if not self.current_process_panel:
+                from views.process_floating_panel import ProcessFloatingPanel
+
+                self.current_process_panel = ProcessFloatingPanel(
+                    process_controller=self.controller.process_controller,
+                    config_manager=self.config_manager,
+                    main_window=self,
+                    parent=self
+                )
+                self.current_process_panel.item_clicked.connect(self.on_item_clicked)
+                self.current_process_panel.window_closed.connect(self.on_process_panel_closed)
+                self.current_process_panel.pin_state_changed.connect(self.on_process_panel_pin_changed)
+                logger.debug("New process floating panel created")
+
+            # Load process into panel
+            self.current_process_panel.load_process(process)
+
+            # Position near sidebar (with offset if pinned panels exist)
+            self.position_process_panel(self.current_process_panel)
+
+            # Update current process
+            self.current_process_id = process_id
+
+            logger.debug("Process loaded into floating panel")
+
+        except Exception as e:
+            logger.error(f"Error in on_process_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al cargar proceso:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
+            )
+
+    def on_process_panel_closed(self):
+        """Handle process panel closed"""
+        logger.info("Process panel closed")
+
+        sender_panel = self.sender()
+
+        # If it's the current (non-pinned) panel
+        if sender_panel == self.current_process_panel:
+            logger.info("Closing active (non-pinned) process panel")
+            self.current_process_id = None
+            self.current_process_panel = None
+            # Clear active process button in sidebar
+            if self.sidebar:
+                self.sidebar.clear_active_process()
+        # If it's a pinned panel
+        elif sender_panel in self.pinned_process_panels:
+            logger.info("Closing pinned process panel")
+            self.pinned_process_panels.remove(sender_panel)
+
+    def on_process_panel_pin_changed(self, is_pinned: bool):
+        """Handle process panel pin state changed"""
+        logger.info(f"Process panel pin state changed: {is_pinned}")
+        # Panel state is managed in on_process_clicked
+
+    def on_process_state_changed(self, process_id: int, is_active: bool):
+        """Handle process state change - refresh sidebar"""
+        logger.info(f"Process state changed: {process_id} -> is_active={is_active}")
+        # Refresh sidebar to show/hide process button
+        self.load_processes_to_sidebar()
+
+    def position_process_panel(self, panel):
+        """Position process panel near sidebar with offset for pinned panels"""
+        # Position to the right of sidebar
+        sidebar_x = self.x() + self.width()
+
+        # Calculate offset based on number of pinned process panels
+        offset = len(self.pinned_process_panels) * 20
+
+        panel.move(sidebar_x + offset, self.y())
+        panel.show()
+
     def on_process_executed_from_panel(self, process_id: int):
         """Handle process execution from panel"""
         try:
@@ -2115,10 +2248,107 @@ class MainWindow(QMainWindow):
                     logger.error(f"Failed to restore global search panel {panel_data.get('id', 'unknown')}: {e}", exc_info=True)
                     continue
 
-            logger.info(f"Global search panel restoration complete: {len(self.pinned_global_search_panels)}/{len(global_panels_data)} panels restored")
+            logger.info(f"Global search panel restoration complete: {len(self.pinned_global_search_panels)} panels restored")
 
         except Exception as e:
             logger.error(f"Failed to restore pinned global search panels: {e}", exc_info=True)
+
+    def restore_pinned_process_panels(self):
+        """Restore pinned process panels from database on startup"""
+        logger.info("=== [PROCESS PANELS RESTORE] Starting restore_pinned_process_panels() ===")
+
+        if not self.controller or not self.controller.process_controller:
+            logger.warning("[PROCESS PANELS RESTORE] ProcessController not available - skipping restoration")
+            return
+
+        try:
+            # Get all active process panels from database
+            db = self.controller.config_manager.db
+            active_panels = db.get_pinned_process_panels(active_only=True)
+
+            if not active_panels:
+                logger.info("[PROCESS PANELS RESTORE] No active process panels to restore")
+                return
+
+            logger.info(f"[PROCESS PANELS RESTORE] Restoring {len(active_panels)} process panels...")
+
+            # Restore each panel
+            for panel_data in active_panels:
+                try:
+                    panel_id = panel_data['id']
+                    process_id = panel_data['process_id']
+
+                    logger.info(f"[PROCESS PANELS RESTORE] Restoring panel {panel_id} for process {process_id}")
+
+                    # Get process
+                    process = self.controller.process_controller.get_process(process_id)
+                    if not process:
+                        logger.warning(f"Process {process_id} not found for panel {panel_id} - skipping")
+                        continue
+
+                    # Create new process floating panel
+                    from views.process_floating_panel import ProcessFloatingPanel
+
+                    restored_panel = ProcessFloatingPanel(
+                        process_controller=self.controller.process_controller,
+                        config_manager=self.config_manager,
+                        main_window=self,
+                        parent=self
+                    )
+
+                    # Set panel_id for persistence
+                    restored_panel.panel_id = panel_id
+
+                    # Connect signals
+                    restored_panel.item_clicked.connect(self.on_item_clicked)
+                    restored_panel.window_closed.connect(self.on_process_panel_closed)
+                    restored_panel.pin_state_changed.connect(self.on_process_panel_pin_changed)
+
+                    # Load process
+                    restored_panel.load_process(process)
+
+                    # Restore position and size
+                    restored_panel.move(panel_data['x_position'], panel_data['y_position'])
+                    restored_panel.resize(panel_data['width'], panel_data['height'])
+
+                    # Set as pinned
+                    restored_panel.is_pinned = True
+                    restored_panel.pin_button.setText("📌")
+                    restored_panel.pin_button.setToolTip("Desanclar panel")
+                    restored_panel.minimize_button.setVisible(True)
+                    # Update header color for pinned state
+                    restored_panel.header_widget.setStyleSheet("""
+                        QWidget {
+                            background-color: #ff8800;
+                            border-top-left-radius: 10px;
+                            border-top-right-radius: 10px;
+                        }
+                    """)
+
+                    # Restore minimized state if needed
+                    if panel_data.get('is_minimized'):
+                        restored_panel.is_minimized = False  # Start as not minimized
+                        restored_panel.on_minimize_clicked()  # Toggle to minimized
+
+                    # Add to pinned panels list
+                    self.pinned_process_panels.append(restored_panel)
+
+                    # Update last_opened in database
+                    db.update_process_panel_last_opened(panel_id)
+
+                    # Show panel
+                    restored_panel.show()
+
+                    logger.info(f"[PROCESS PANELS RESTORE] Panel {panel_id} for process '{process.name}' restored successfully")
+
+                except Exception as e:
+                    logger.error(f"Failed to restore process panel {panel_data.get('id', 'unknown')}: {e}", exc_info=True)
+                    continue
+
+            logger.info(f"[PROCESS PANELS RESTORE] Restoration complete: {len(self.pinned_process_panels)} panels restored")
+
+        except Exception as e:
+            logger.error(f"Error during process panels restoration: {e}", exc_info=True)
 
     def on_restore_panel_requested(self, panel_id: int):
         """Handle request to restore/open a saved panel"""

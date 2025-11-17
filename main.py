@@ -212,6 +212,11 @@ def main():
         window.load_categories(categories)
         logger.info("Categories loaded into sidebar")
 
+        # Load active processes into sidebar
+        logger.info("Loading active processes into sidebar...")
+        window.load_processes_to_sidebar()
+        logger.info("Active processes loaded into sidebar")
+
         # Show window
         logger.info("Showing window...")
         window.show()

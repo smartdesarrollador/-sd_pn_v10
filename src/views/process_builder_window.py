@@ -72,6 +72,10 @@ class ProcessBuilderWindow(QWidget):
         # Step widgets in constructor
         self.step_widgets = []
 
+        # Saved processes filtering
+        self.all_saved_processes = []  # All processes from DB
+        self.filtered_saved_processes = []  # Filtered by search
+
         # Edit mode state
         self.edit_mode_active = False
         self.process_being_edited = None  # ID of process being edited
@@ -667,6 +671,25 @@ class ProcessBuilderWindow(QWidget):
 
         layout.addLayout(title_layout)
 
+        # Search bar for processes
+        self.processes_search = QLineEdit()
+        self.processes_search.setPlaceholderText("🔍 Buscar procesos...")
+        self.processes_search.setStyleSheet("""
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                border: 2px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 10pt;
+            }
+            QLineEdit:focus {
+                border-color: #ff6b00;
+            }
+        """)
+        self.processes_search.textChanged.connect(self.on_process_search_changed)
+        layout.addWidget(self.processes_search)
+
         # Info label
         self.processes_info_label = QLabel("Click en checkbox para activar/desactivar")
         self.processes_info_label.setStyleSheet("""
@@ -864,32 +887,60 @@ class ProcessBuilderWindow(QWidget):
 
         try:
             # Get ALL processes (including inactive and archived)
-            processes = self.process_controller.process_manager.get_all_processes(
+            self.all_saved_processes = self.process_controller.process_manager.get_all_processes(
                 include_archived=True,
                 include_inactive=True
             )
 
-            # Clear existing widgets
-            while self.processes_list_layout.count() > 1:  # Keep stretch
-                item = self.processes_list_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+            # Apply current search filter
+            self.apply_process_search_filter()
 
-            # Add process items
-            for process in processes:
-                process_item = self.create_process_list_item(process)
-                self.processes_list_layout.insertWidget(
-                    self.processes_list_layout.count() - 1,  # Before stretch
-                    process_item
-                )
-
-            # Update count
-            self.processes_count_label.setText(f"({len(processes)})")
-
-            logger.info(f"Loaded {len(processes)} saved processes")
+            logger.info(f"Loaded {len(self.all_saved_processes)} saved processes")
 
         except Exception as e:
             logger.error(f"Error loading saved processes: {e}")
+
+    def apply_process_search_filter(self):
+        """Apply search filter to saved processes"""
+        # Get search query
+        search_query = self.processes_search.text().strip().lower()
+
+        # Filter processes
+        if search_query:
+            self.filtered_saved_processes = [
+                p for p in self.all_saved_processes
+                if search_query in p.name.lower() or
+                   (p.description and search_query in p.description.lower())
+            ]
+        else:
+            self.filtered_saved_processes = self.all_saved_processes.copy()
+
+        # Display filtered processes
+        self.display_saved_processes()
+
+    def display_saved_processes(self):
+        """Display the filtered saved processes"""
+        # Clear existing widgets
+        while self.processes_list_layout.count() > 1:  # Keep stretch
+            item = self.processes_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # Add process items
+        for process in self.filtered_saved_processes:
+            process_item = self.create_process_list_item(process)
+            self.processes_list_layout.insertWidget(
+                self.processes_list_layout.count() - 1,  # Before stretch
+                process_item
+            )
+
+        # Update count
+        total = len(self.all_saved_processes)
+        filtered = len(self.filtered_saved_processes)
+        if filtered < total:
+            self.processes_count_label.setText(f"({filtered}/{total})")
+        else:
+            self.processes_count_label.setText(f"({total})")
 
     def create_process_list_item(self, process) -> QWidget:
         """Create a widget for a single process in the list"""
@@ -977,6 +1028,10 @@ class ProcessBuilderWindow(QWidget):
         container.mousePressEvent = lambda event: self.on_process_item_clicked(process.id)
 
         return container
+
+    def on_process_search_changed(self, text: str):
+        """Handle process search query change"""
+        self.apply_process_search_filter()
 
     def on_process_toggle(self, process_id: int, state: int):
         """Handle process active/inactive toggle"""

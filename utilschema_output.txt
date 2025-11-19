@@ -1,0 +1,1 @@
+C:\Users\ASUS\AppData\Local\Programs\Python\Python311\python.exe: can't open file 'C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\utilget_full_schema.py': [Errno 2] No such file or directory

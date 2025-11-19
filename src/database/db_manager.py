@@ -86,181 +86,382 @@ class DBManager:
             raise
 
     def _create_database(self):
-        """Create database schema with all tables and indices"""
+        """Create database schema with all tables and indices - COMPLETE SCHEMA"""
         # Use self.connect() to ensure we use the same connection (important for :memory:)
         conn = self.connect()
         cursor = conn.cursor()
 
-        # Create tables
-        cursor.executescript("""
-            -- Tabla de configuración general
-            CREATE TABLE IF NOT EXISTS settings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                key TEXT UNIQUE NOT NULL,
-                value TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+        # Read SQL schema from file if it exists, otherwise use embedded schema
+        schema_file = Path(__file__).parent.parent.parent / "util" / "complete_schema.sql"
 
-            -- Tabla de categorías
-            CREATE TABLE IF NOT EXISTS categories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                icon TEXT,
-                order_index INTEGER NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
-                is_predefined BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                color TEXT,
-                badge TEXT,
-                item_count INTEGER DEFAULT 0,
-                total_uses INTEGER DEFAULT 0,
-                last_accessed TIMESTAMP,
-                access_count INTEGER DEFAULT 0,
-                is_pinned BOOLEAN DEFAULT 0,
-                pinned_order INTEGER DEFAULT 0
-            );
+        if schema_file.exists():
+            logger.info(f"Loading schema from file: {schema_file}")
+            with open(schema_file, 'r', encoding='utf-8') as f:
+                schema_sql = f.read()
+            cursor.executescript(schema_sql)
+        else:
+            # Embedded complete schema
+            cursor.executescript("""
+                -- Tabla de configuración general
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT UNIQUE NOT NULL,
+                    value TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
 
-            -- Tabla de items
-            CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category_id INTEGER NOT NULL,
-                label TEXT NOT NULL,
-                content TEXT NOT NULL,
-                type TEXT CHECK(type IN ('TEXT', 'URL', 'CODE', 'PATH')) DEFAULT 'TEXT',
-                icon TEXT,
-                is_sensitive BOOLEAN DEFAULT 0,
-                is_favorite BOOLEAN DEFAULT 0,
-                favorite_order INTEGER DEFAULT 0,
-                use_count INTEGER DEFAULT 0,
-                tags TEXT,
-                description TEXT,
-                working_dir TEXT,
-                color TEXT,
-                badge TEXT,
-                is_active BOOLEAN DEFAULT 1,
-                is_archived BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_used TIMESTAMP,
-                -- Campos de listas avanzadas
-                is_list BOOLEAN DEFAULT 0,
-                list_group TEXT DEFAULT NULL,
-                orden_lista INTEGER DEFAULT 0,
-                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-            );
+                -- Tabla de categorías
+                CREATE TABLE IF NOT EXISTS categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    icon TEXT,
+                    order_index INTEGER NOT NULL,
+                    is_active BOOLEAN DEFAULT 1,
+                    is_predefined BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    color TEXT,
+                    badge TEXT,
+                    item_count INTEGER DEFAULT 0,
+                    total_uses INTEGER DEFAULT 0,
+                    last_accessed TIMESTAMP,
+                    access_count INTEGER DEFAULT 0,
+                    is_pinned BOOLEAN DEFAULT 0,
+                    pinned_order INTEGER DEFAULT 0
+                );
 
-            -- Tabla de historial de portapapeles
-            CREATE TABLE IF NOT EXISTS clipboard_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                item_id INTEGER,
-                content TEXT NOT NULL,
-                copied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
-            );
+                -- Tabla de items (COMPLETA con TODOS los campos)
+                CREATE TABLE IF NOT EXISTS items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL,
+                    label TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    type TEXT CHECK(type IN ('TEXT', 'URL', 'CODE', 'PATH')) DEFAULT 'TEXT',
+                    icon TEXT,
+                    is_sensitive BOOLEAN DEFAULT 0,
+                    is_favorite INTEGER DEFAULT 0,
+                    favorite_order INTEGER DEFAULT 0,
+                    use_count INTEGER DEFAULT 0,
+                    tags TEXT,
+                    description TEXT,
+                    working_dir TEXT,
+                    shortcut TEXT,
+                    color TEXT,
+                    badge TEXT,
+                    is_active BOOLEAN DEFAULT 1,
+                    is_archived BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_used TIMESTAMP,
+                    is_list BOOLEAN DEFAULT 0,
+                    list_group TEXT DEFAULT NULL,
+                    orden_lista INTEGER DEFAULT 0,
+                    file_size INTEGER DEFAULT NULL,
+                    file_type VARCHAR(50) DEFAULT NULL,
+                    file_extension VARCHAR(10) DEFAULT NULL,
+                    original_filename VARCHAR(255) DEFAULT NULL,
+                    file_hash VARCHAR(64) DEFAULT NULL,
+                    is_table BOOLEAN DEFAULT 0,
+                    name_table TEXT DEFAULT NULL,
+                    orden_table TEXT DEFAULT NULL,
+                    is_component BOOLEAN DEFAULT 0,
+                    name_component VARCHAR(50) DEFAULT NULL,
+                    component_config TEXT DEFAULT NULL,
+                    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+                );
 
-            -- Tabla de paneles anclados (pinned panels)
-            CREATE TABLE IF NOT EXISTS pinned_panels (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category_id INTEGER NOT NULL,
-                custom_name TEXT,
-                custom_color TEXT,
-                x_position INTEGER NOT NULL,
-                y_position INTEGER NOT NULL,
-                width INTEGER NOT NULL DEFAULT 350,
-                height INTEGER NOT NULL DEFAULT 500,
-                is_minimized BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_opened TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                open_count INTEGER DEFAULT 0,
-                is_active BOOLEAN DEFAULT 1,
-                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-            );
+                -- Tabla de historial de portapapeles
+                CREATE TABLE IF NOT EXISTS clipboard_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_id INTEGER,
+                    content TEXT NOT NULL,
+                    copied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+                );
 
-            -- Tabla de paneles anclados de procesos (pinned process panels)
-            CREATE TABLE IF NOT EXISTS pinned_process_panels (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                process_id INTEGER NOT NULL,
-                x_position INTEGER NOT NULL,
-                y_position INTEGER NOT NULL,
-                width INTEGER NOT NULL DEFAULT 500,
-                height INTEGER NOT NULL DEFAULT 600,
-                is_minimized BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_opened TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                open_count INTEGER DEFAULT 0,
-                is_active BOOLEAN DEFAULT 1,
-                FOREIGN KEY (process_id) REFERENCES processes(id) ON DELETE CASCADE
-            );
+                -- Tabla de historial de uso de items
+                CREATE TABLE IF NOT EXISTS item_usage_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_id INTEGER NOT NULL,
+                    used_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    execution_time_ms INTEGER DEFAULT 0,
+                    success INTEGER DEFAULT 1,
+                    error_message TEXT,
+                    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+                );
 
-            -- Tabla de configuración del navegador embebido
-            CREATE TABLE IF NOT EXISTS browser_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                home_url TEXT DEFAULT 'https://www.google.com',
-                is_visible BOOLEAN DEFAULT 0,
-                width INTEGER DEFAULT 500,
-                height INTEGER DEFAULT 700,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                -- Tabla de paneles anclados (COMPLETA con campos de global search)
+                CREATE TABLE IF NOT EXISTS pinned_panels (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL,
+                    custom_name TEXT,
+                    custom_color TEXT,
+                    x_position INTEGER NOT NULL,
+                    y_position INTEGER NOT NULL,
+                    width INTEGER NOT NULL DEFAULT 350,
+                    height INTEGER NOT NULL DEFAULT 500,
+                    is_minimized BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_opened TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    open_count INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT 1,
+                    panel_type TEXT DEFAULT 'category',
+                    search_query TEXT DEFAULT NULL,
+                    advanced_filters TEXT DEFAULT NULL,
+                    state_filter TEXT DEFAULT 'normal',
+                    filter_config TEXT DEFAULT NULL,
+                    keyboard_shortcut TEXT DEFAULT NULL,
+                    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+                );
 
-            -- Tabla de marcadores del navegador
-            CREATE TABLE IF NOT EXISTS bookmarks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                url TEXT NOT NULL,
-                folder TEXT DEFAULT NULL,
-                icon TEXT DEFAULT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                order_index INTEGER DEFAULT 0
-            );
+                -- Tabla de procesos
+                CREATE TABLE IF NOT EXISTS processes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    icon TEXT DEFAULT '⚙',
+                    color TEXT,
+                    is_pinned BOOLEAN DEFAULT 0,
+                    pinned_order INTEGER DEFAULT 0,
+                    order_index INTEGER DEFAULT 0,
+                    use_count INTEGER DEFAULT 0,
+                    last_used TIMESTAMP,
+                    access_count INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT 1,
+                    is_archived BOOLEAN DEFAULT 0,
+                    auto_copy_results BOOLEAN DEFAULT 0,
+                    execution_mode TEXT DEFAULT 'sequential',
+                    delay_between_steps INTEGER DEFAULT 500,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    tags TEXT,
+                    category TEXT
+                );
 
-            -- Tabla de Speed Dial (accesos rápidos)
-            CREATE TABLE IF NOT EXISTS speed_dials (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                url TEXT NOT NULL,
-                thumbnail_path TEXT DEFAULT NULL,
-                background_color TEXT DEFAULT '#16213e',
-                icon TEXT DEFAULT '🌐',
-                position INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                -- Tabla de items de procesos
+                CREATE TABLE IF NOT EXISTS process_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    process_id INTEGER NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    step_order INTEGER NOT NULL,
+                    group_name TEXT,
+                    group_order INTEGER DEFAULT 0,
+                    is_optional BOOLEAN DEFAULT 0,
+                    is_enabled BOOLEAN DEFAULT 1,
+                    wait_for_confirmation BOOLEAN DEFAULT 0,
+                    custom_label TEXT,
+                    notes TEXT,
+                    condition_type TEXT DEFAULT 'always',
+                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (process_id) REFERENCES processes(id) ON DELETE CASCADE,
+                    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+                    UNIQUE(process_id, item_id, step_order)
+                );
 
-            -- Índices para optimización
-            CREATE INDEX IF NOT EXISTS idx_categories_order ON categories(order_index);
-            CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
-            CREATE INDEX IF NOT EXISTS idx_items_last_used ON items(last_used DESC);
-            CREATE INDEX IF NOT EXISTS idx_clipboard_history_date ON clipboard_history(copied_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_pinned_category ON pinned_panels(category_id);
-            CREATE INDEX IF NOT EXISTS idx_pinned_last_opened ON pinned_panels(last_opened DESC);
-            CREATE INDEX IF NOT EXISTS idx_pinned_active ON pinned_panels(is_active);
-            CREATE INDEX IF NOT EXISTS idx_bookmarks_order ON bookmarks(order_index);
-            CREATE INDEX IF NOT EXISTS idx_bookmarks_url ON bookmarks(url);
-            CREATE INDEX IF NOT EXISTS idx_speed_dials_position ON speed_dials(position);
-            -- Índices para listas avanzadas
-            CREATE INDEX IF NOT EXISTS idx_items_is_list ON items(is_list) WHERE is_list = 1;
-            CREATE INDEX IF NOT EXISTS idx_items_list_group ON items(list_group) WHERE list_group IS NOT NULL;
-            CREATE INDEX IF NOT EXISTS idx_items_orden_lista ON items(category_id, list_group, orden_lista) WHERE is_list = 1;
+                -- Tabla de paneles anclados de procesos
+                CREATE TABLE IF NOT EXISTS pinned_process_panels (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    process_id INTEGER NOT NULL,
+                    x_position INTEGER NOT NULL,
+                    y_position INTEGER NOT NULL,
+                    width INTEGER NOT NULL DEFAULT 500,
+                    height INTEGER NOT NULL DEFAULT 600,
+                    is_minimized BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_opened TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    open_count INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT 1,
+                    FOREIGN KEY (process_id) REFERENCES processes(id) ON DELETE CASCADE
+                );
 
-            -- Configuración inicial por defecto
-            INSERT OR IGNORE INTO settings (key, value) VALUES
-                ('theme', '"dark"'),
-                ('panel_width', '300'),
-                ('sidebar_width', '70'),
-                ('hotkey', '"ctrl+shift+v"'),
-                ('always_on_top', 'true'),
-                ('start_with_windows', 'false'),
-                ('animation_speed', '300'),
-                ('opacity', '0.95'),
-                ('max_history', '20');
-        """)
+                -- Tabla de historial de ejecución de procesos
+                CREATE TABLE IF NOT EXISTS process_execution_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    process_id INTEGER NOT NULL,
+                    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    duration_ms INTEGER,
+                    status TEXT DEFAULT 'running',
+                    total_steps INTEGER,
+                    completed_steps INTEGER DEFAULT 0,
+                    failed_steps INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    failed_step_id INTEGER,
+                    FOREIGN KEY (process_id) REFERENCES processes(id) ON DELETE CASCADE
+                );
+
+                -- Tabla de configuración del navegador embebido
+                CREATE TABLE IF NOT EXISTS browser_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    home_url TEXT DEFAULT 'https://www.google.com',
+                    is_visible BOOLEAN DEFAULT 0,
+                    width INTEGER DEFAULT 500,
+                    height INTEGER DEFAULT 700,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de perfiles de navegador
+                CREATE TABLE IF NOT EXISTS browser_profiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    storage_path TEXT NOT NULL,
+                    is_default BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de sesiones de navegador
+                CREATE TABLE IF NOT EXISTS browser_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    is_auto_save BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de pestañas de sesiones
+                CREATE TABLE IF NOT EXISTS session_tabs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    url TEXT NOT NULL,
+                    title TEXT DEFAULT 'Nueva pestaña',
+                    position INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES browser_sessions(id) ON DELETE CASCADE
+                );
+
+                -- Tabla de marcadores del navegador
+                CREATE TABLE IF NOT EXISTS bookmarks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    folder TEXT DEFAULT NULL,
+                    icon TEXT DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    order_index INTEGER DEFAULT 0
+                );
+
+                -- Tabla de Speed Dial
+                CREATE TABLE IF NOT EXISTS speed_dials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    thumbnail_path TEXT DEFAULT NULL,
+                    background_color TEXT DEFAULT '#16213e',
+                    icon TEXT DEFAULT '🌐',
+                    position INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de tipos de componentes
+                CREATE TABLE IF NOT EXISTS component_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(50) UNIQUE NOT NULL,
+                    description TEXT,
+                    default_config TEXT,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de historial de búsqueda
+                CREATE TABLE IF NOT EXISTS search_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query TEXT NOT NULL,
+                    search_mode TEXT NOT NULL CHECK(search_mode IN ('smart', 'fts5', 'fuzzy', 'exact')),
+                    filters TEXT,
+                    result_count INTEGER DEFAULT 0,
+                    execution_time_ms REAL DEFAULT 0.0,
+                    search_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de estadísticas de búsqueda
+                CREATE TABLE IF NOT EXISTS search_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query TEXT NOT NULL UNIQUE,
+                    search_count INTEGER DEFAULT 1,
+                    last_searched DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    avg_result_count REAL DEFAULT 0.0,
+                    avg_execution_time_ms REAL DEFAULT 0.0
+                );
+
+                -- Tabla de colecciones inteligentes
+                CREATE TABLE IF NOT EXISTS smart_collections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    query_config TEXT NOT NULL,
+                    icon TEXT DEFAULT '📂',
+                    color TEXT,
+                    is_active BOOLEAN DEFAULT 1,
+                    auto_update BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Tabla de items en colecciones inteligentes
+                CREATE TABLE IF NOT EXISTS smart_collection_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    collection_id INTEGER NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    relevance_score REAL DEFAULT 1.0,
+                    FOREIGN KEY (collection_id) REFERENCES smart_collections(id) ON DELETE CASCADE,
+                    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+                    UNIQUE(collection_id, item_id)
+                );
+
+                -- Tabla de sesiones de usuario
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT UNIQUE NOT NULL,
+                    user_id TEXT DEFAULT 'default_user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL,
+                    is_valid BOOLEAN DEFAULT 1
+                );
+
+                -- ÍNDICES para optimización
+                CREATE INDEX IF NOT EXISTS idx_categories_order ON categories(order_index);
+                CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
+                CREATE INDEX IF NOT EXISTS idx_items_last_used ON items(last_used DESC);
+                CREATE INDEX IF NOT EXISTS idx_items_favorite ON items(is_favorite) WHERE is_favorite = 1;
+                CREATE INDEX IF NOT EXISTS idx_clipboard_history_date ON clipboard_history(copied_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_pinned_category ON pinned_panels(category_id);
+                CREATE INDEX IF NOT EXISTS idx_pinned_last_opened ON pinned_panels(last_opened DESC);
+                CREATE INDEX IF NOT EXISTS idx_pinned_active ON pinned_panels(is_active);
+                CREATE INDEX IF NOT EXISTS idx_bookmarks_order ON bookmarks(order_index);
+                CREATE INDEX IF NOT EXISTS idx_bookmarks_url ON bookmarks(url);
+                CREATE INDEX IF NOT EXISTS idx_speed_dials_position ON speed_dials(position);
+                CREATE INDEX IF NOT EXISTS idx_items_is_list ON items(is_list) WHERE is_list = 1;
+                CREATE INDEX IF NOT EXISTS idx_items_list_group ON items(list_group) WHERE list_group IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_items_orden_lista ON items(category_id, list_group, orden_lista) WHERE is_list = 1;
+                CREATE INDEX IF NOT EXISTS idx_processes_active ON processes(is_active) WHERE is_active = 1;
+                CREATE INDEX IF NOT EXISTS idx_processes_pinned ON processes(is_pinned, pinned_order);
+                CREATE INDEX IF NOT EXISTS idx_process_items_order ON process_items(process_id, step_order);
+                CREATE INDEX IF NOT EXISTS idx_item_usage_history ON item_usage_history(item_id, used_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_sessions_valid ON sessions(is_valid, expires_at);
+
+                -- Configuración inicial por defecto
+                INSERT OR IGNORE INTO settings (key, value) VALUES
+                    ('theme', '"dark"'),
+                    ('panel_width', '300'),
+                    ('sidebar_width', '70'),
+                    ('hotkey', '"ctrl+shift+v"'),
+                    ('always_on_top', 'true'),
+                    ('start_with_windows', 'false'),
+                    ('animation_speed', '300'),
+                    ('opacity', '0.95'),
+                    ('max_history', '20');
+            """)
 
         conn.commit()
         # Don't close the connection - it's managed by self.connection
-        logger.info("Database schema created successfully")
+        logger.info("Database schema created successfully with COMPLETE SCHEMA")
 
     def execute_query(self, query: str, params: tuple = ()) -> List[Dict]:
         """

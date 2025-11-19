@@ -731,12 +731,12 @@ class ProcessFloatingPanel(QWidget):
             # Import ProcessBuilderWindow
             from views.process_builder_window import ProcessBuilderWindow
 
-            # Create and show edit window
+            # Create and show edit window (pass process_id, not process object)
             edit_window = ProcessBuilderWindow(
-                process_controller=self.process_controller,
                 config_manager=self.config_manager,
-                parent=self.main_window,
-                process_to_edit=self.current_process
+                process_controller=self.process_controller,
+                process_id=self.current_process.id,
+                parent=self.main_window
             )
 
             # Connect save signal to reload panel

@@ -2986,12 +2986,8 @@ class DBManager:
                         'errors': [f"Table name '{table_name}' already exists"]
                     }
 
-                # Prepare tag string
-                tag_str = ','.join(tags) if tags else ''
-                if tag_str:
-                    tag_str += f',{table_name}'  # Add table name as tag
-                else:
-                    tag_str = table_name
+                # Preparar tags base (los que vienen del usuario)
+                base_tags = tags if tags else []
 
                 # Prepare sensitive columns set for fast lookup
                 sensitive_cols_set = set(sensitive_columns) if sensitive_columns else set()
@@ -3001,10 +2997,14 @@ class DBManager:
 
                 # Insert each cell as an item
                 for row_idx, row_data in enumerate(table_data):
-                    # Obtener el valor de la primera celda para list_group y tag
+                    # Obtener el valor de la primera celda (nombre de fila)
                     first_cell_value = ""
+                    first_cell_original = ""  # Valor original sin sanitizar para el tag
+
                     if len(row_data) > 0 and row_data[0]:
-                        first_cell_value = str(row_data[0]).strip()
+                        first_cell_original = str(row_data[0]).strip()
+                        first_cell_value = first_cell_original
+
                         # Sanitizar el valor para usarlo en list_group (remover caracteres especiales)
                         first_cell_value = first_cell_value.replace(' ', '_')
                         first_cell_value = ''.join(c for c in first_cell_value if c.isalnum() or c in ('_', '-'))
@@ -3015,16 +3015,10 @@ class DBManager:
                     # Si la primera celda está vacía, usar row_N como fallback
                     if not first_cell_value:
                         first_cell_value = f"row_{row_idx}"
+                        first_cell_original = f"row_{row_idx}"
 
-                    # Generar list_group: {table_name}_{primera_celda}
-                    list_group_name = f"{table_name}_{first_cell_value}"
-
-                    # Generar tags para esta fila: tags base + table_name + primera_celda
-                    row_tag_str = tag_str  # Tags base (incluye table_name)
-                    if row_tag_str:
-                        row_tag_str += f',{first_cell_value}'  # Agregar valor de primera celda como tag
-                    else:
-                        row_tag_str = first_cell_value
+                    # Generar list_group: solo el nombre de la primera celda (sin prefijo de tabla)
+                    list_group_name = first_cell_value
 
                     for col_idx, cell_value in enumerate(row_data):
                         # Skip empty cells
@@ -3034,6 +3028,19 @@ class DBManager:
                         try:
                             # Create item for this cell
                             column_name = column_names[col_idx] if col_idx < len(column_names) else f"COL_{col_idx}"
+
+                            # Generar tags automáticos para esta celda
+                            # Formato: ["tabla", "lista", "nombre_tabla", "nombre_fila", "nombre_columna"]
+                            # Nota: Se incluye "lista" porque cada fila de una tabla también es una lista
+                            cell_tags = ["tabla", "lista", table_name, first_cell_original, column_name]
+
+                            # Agregar tags base del usuario (si existen)
+                            for tag in base_tags:
+                                if tag and tag not in cell_tags:
+                                    cell_tags.append(tag)
+
+                            # Convertir a JSON para almacenar
+                            tags_json = json.dumps(cell_tags)
 
                             # Determinar si esta columna es sensible
                             is_sensitive = 1 if col_idx in sensitive_cols_set else 0
@@ -3068,7 +3075,7 @@ class DBManager:
                                 list_group_name,  # list_group = {table_name}_{primera_celda}
                                 col_idx + 1,  # orden_lista = column index + 1 (empieza en 1)
                                 is_sensitive,  # is_sensitive (1 si columna marcada como sensible)
-                                row_tag_str  # tags (incluye table_name + primera_celda)
+                                tags_json  # tags en formato JSON: ["tabla", "nombre_tabla", "nombre_fila", "nombre_columna"]
                             ))
 
                             items_created += 1

@@ -34,6 +34,7 @@ class ItemButton(QFrame):
     archived_toggled = pyqtSignal(int, bool)  # item_id, is_archived (deprecated - kept for compatibility)
     url_open_requested = pyqtSignal(str)  # url to open in embedded browser
     table_view_requested = pyqtSignal(str)  # table_name to view complete table
+    web_static_render_requested = pyqtSignal(object)  # item to render as WEB_STATIC
 
     def __init__(self, item: Item, show_category: bool = False, parent=None):
         super().__init__(parent)
@@ -260,75 +261,7 @@ class ItemButton(QFrame):
 
         # Favorite button removed - now available in Item Details Dialog
 
-        # Info button (show details)
-        self.info_btn = QPushButton("ℹ️")
-        self.info_btn.setFixedSize(30, 30)
-        self.info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.info_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                font-size: 14pt;
-            }
-            QPushButton:hover {
-                background-color: #3e3e42;
-                border-radius: 3px;
-            }
-        """)
-        self.info_btn.setToolTip("Ver detalles del item")
-        self.info_btn.clicked.connect(self.show_details)
-        main_layout.addWidget(self.info_btn)
-
-        # View table button (for table items)
-        if hasattr(self.item, 'is_table') and self.item.is_table:
-            self.view_table_btn = QPushButton("🗂️")
-            self.view_table_btn.setFixedSize(35, 35)
-            self.view_table_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.view_table_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #007acc;
-                    color: #ffffff;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 14pt;
-                }
-                QPushButton:hover {
-                    background-color: #005a9e;
-                }
-                QPushButton:pressed {
-                    background-color: #004578;
-                }
-            """)
-            table_name = getattr(self.item, 'name_table', 'Tabla')
-            self.view_table_btn.setToolTip(f"Ver tabla completa: {table_name}")
-            self.view_table_btn.clicked.connect(self.view_table)
-            main_layout.addWidget(self.view_table_btn)
-
-        # Reveal button for sensitive items
-        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
-            self.reveal_button = QPushButton("👁")
-            self.reveal_button.setFixedSize(35, 35)
-            self.reveal_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #cc0000;
-                    color: #ffffff;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 16pt;
-                }
-                QPushButton:hover {
-                    background-color: #9e0000;
-                }
-                QPushButton:pressed {
-                    background-color: #780000;
-                }
-            """)
-            self.reveal_button.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.reveal_button.setToolTip("Revelar/Ocultar contenido sensible")
-            self.reveal_button.clicked.connect(self.toggle_reveal)
-            main_layout.addWidget(self.reveal_button)
-
-        # Right side: Action buttons based on item type
+        # Right side: Action buttons based on item type (TYPE-SPECIFIC BUTTONS FIRST FOR VISIBILITY)
         if self.item.type == ItemType.CODE:
             # Execute command button (only for CODE items)
             self.execute_button = QPushButton("⚡")
@@ -352,6 +285,30 @@ class ItemButton(QFrame):
             self.execute_button.setToolTip("Ejecutar comando")
             self.execute_button.clicked.connect(self.execute_command)
             main_layout.addWidget(self.execute_button)
+
+        elif self.item.type == 'WEB_STATIC' or self.item.type == ItemType.WEB_STATIC:
+            # Render button (only for WEB_STATIC items) - FIRST FOR VISIBILITY
+            self.render_button = QPushButton("📱")  # Cambiado de 🌐 a 📱 para diferenciarlo de URL
+            self.render_button.setFixedSize(35, 35)
+            self.render_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+                QPushButton:pressed {
+                    background-color: #388E3C;
+                }
+            """)
+            self.render_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.render_button.setToolTip("Renderizar aplicación web estática")
+            self.render_button.clicked.connect(self.render_web_static)
+            main_layout.addWidget(self.render_button)
 
         elif self.item.type == ItemType.URL:
             # URL action buttons - two buttons layout
@@ -461,6 +418,76 @@ class ItemButton(QFrame):
                 path_buttons_layout.addWidget(self.open_file_button)
 
             main_layout.addLayout(path_buttons_layout)
+
+        # Common buttons (for all item types)
+
+        # View table button (for table items)
+        if hasattr(self.item, 'is_table') and self.item.is_table:
+            self.view_table_btn = QPushButton("🗂️")
+            self.view_table_btn.setFixedSize(35, 35)
+            self.view_table_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.view_table_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #007acc;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 14pt;
+                }
+                QPushButton:hover {
+                    background-color: #005a9e;
+                }
+                QPushButton:pressed {
+                    background-color: #004578;
+                }
+            """)
+            table_name = getattr(self.item, 'name_table', 'Tabla')
+            self.view_table_btn.setToolTip(f"Ver tabla completa: {table_name}")
+            self.view_table_btn.clicked.connect(self.view_table)
+            main_layout.addWidget(self.view_table_btn)
+
+        # Reveal button for sensitive items
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+            self.reveal_button = QPushButton("👁")
+            self.reveal_button.setFixedSize(35, 35)
+            self.reveal_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #cc0000;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+                QPushButton:hover {
+                    background-color: #9e0000;
+                }
+                QPushButton:pressed {
+                    background-color: #780000;
+                }
+            """)
+            self.reveal_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.reveal_button.setToolTip("Revelar/Ocultar contenido sensible")
+            self.reveal_button.clicked.connect(self.toggle_reveal)
+            main_layout.addWidget(self.reveal_button)
+
+        # Info button (show details) - ALWAYS LAST
+        self.info_btn = QPushButton("ℹ️")
+        self.info_btn.setFixedSize(30, 30)
+        self.info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.info_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                font-size: 14pt;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+                border-radius: 3px;
+            }
+        """)
+        self.info_btn.setToolTip("Ver detalles del item")
+        self.info_btn.clicked.connect(self.show_details)
+        main_layout.addWidget(self.info_btn)
 
         # Set initial style (different for sensitive items and file items)
         if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
@@ -1192,6 +1219,58 @@ class ItemButton(QFrame):
                 parent=self.window()
             )
             dialog.exec()
+
+        finally:
+            # Track execution end
+            self.usage_tracker.track_execution_end(self.item.id, start_time, success, error_msg)
+
+    def render_web_static(self):
+        """Renderiza item WEB_STATIC en navegador embebido seguro"""
+        if self.item.type != 'WEB_STATIC' and self.item.type != ItemType.WEB_STATIC:
+            return
+
+        # Track execution start
+        start_time = self.usage_tracker.track_execution_start(self.item.id)
+        success = False
+        error_msg = None
+
+        try:
+            # Visual feedback - cambiar botón mientras abre
+            original_style = self.render_button.styleSheet()
+            self.render_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #00d4ff;
+                    color: #000000;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+            """)
+
+            # Emitir señal con el item completo
+            self.web_static_render_requested.emit(self.item)
+            success = True
+
+            logger.info(f"WEB_STATIC render requested for item: {self.item.label}")
+
+            # Restaurar estilo después de 300ms
+            QTimer.singleShot(300, lambda: self.render_button.setStyleSheet(original_style))
+
+        except Exception as e:
+            logger.error(f"Error rendering WEB_STATIC item {self.item.label}: {e}")
+            error_msg = str(e)
+
+            # Restaurar estilo con color de error
+            self.render_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f44336;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16pt;
+                }
+            """)
+            QTimer.singleShot(1000, lambda: self.render_button.setStyleSheet(original_style))
 
         finally:
             # Track execution end

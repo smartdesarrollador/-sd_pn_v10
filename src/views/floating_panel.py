@@ -412,7 +412,7 @@ class FloatingPanel(QWidget):
         # Scroll area for items
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)  # Siempre mostrar scroll horizontal
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setStyleSheet(f"""
             QScrollArea {{
@@ -427,9 +427,11 @@ class FloatingPanel(QWidget):
         self.items_container = QWidget()
         # Configurar política de tamaño para permitir expansión horizontal
         self.items_container.setSizePolicy(
-            QSizePolicy.Policy.MinimumExpanding,  # Horizontal: puede expandirse más allá del tamaño mínimo
+            QSizePolicy.Policy.Expanding,  # Horizontal: expandir completamente (permite scroll)
             QSizePolicy.Policy.Preferred  # Vertical: tamaño preferido
         )
+        # Establecer un ancho mínimo para forzar el scroll horizontal
+        self.items_container.setMinimumWidth(800)  # Ancho mínimo que fuerza scroll horizontal
         # Asegurar fondo oscuro consistente (importante para Windows modo claro)
         self.items_container.setStyleSheet(f"""
             QWidget {{
@@ -531,6 +533,7 @@ class FloatingPanel(QWidget):
             item_button.item_clicked.connect(self.on_item_clicked)
             item_button.url_open_requested.connect(self.on_url_open_requested)
             item_button.table_view_requested.connect(self.on_table_view_requested)
+            item_button.web_static_render_requested.connect(self.on_web_static_render_requested)
             self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
 
         logger.info(f"Successfully added {len(items)} item buttons to layout")
@@ -590,6 +593,7 @@ class FloatingPanel(QWidget):
                 item_button.item_clicked.connect(self.on_item_clicked)
                 item_button.url_open_requested.connect(self.on_url_open_requested)
                 item_button.table_view_requested.connect(self.on_table_view_requested)
+                item_button.web_static_render_requested.connect(self.on_web_static_render_requested)
                 self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
 
         # === SECCIÓN DE LISTAS ===
@@ -689,6 +693,29 @@ class FloatingPanel(QWidget):
 
         except Exception as e:
             logger.error(f"Error opening table view: {e}", exc_info=True)
+
+    def on_web_static_render_requested(self, item):
+        """Handle WEB_STATIC render request from ItemButton"""
+        logger.info(f"WEB_STATIC render requested: {item.label}")
+
+        try:
+            from views.dialogs.embedded_browser_dialog import EmbeddedBrowserDialog
+
+            # Abrir diálogo con navegador embebido
+            dialog = EmbeddedBrowserDialog(html_content=item.content, parent=self)
+            dialog.setWindowTitle(f"🌐 {item.label}")
+            dialog.show()  # Usar show() en lugar de exec() para que sea no-modal
+
+            logger.info(f"WEB_STATIC dialog opened for item: {item.label}")
+
+        except Exception as e:
+            logger.error(f"Error opening WEB_STATIC renderer: {e}", exc_info=True)
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al renderizar item web estático:\n\n{str(e)}"
+            )
 
     def on_item_state_changed(self, item_id: str):
         """Handle item state change (favorite/archived) from ItemDetailsDialog"""

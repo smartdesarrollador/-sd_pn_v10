@@ -370,18 +370,20 @@ else:
 
 ### Trabajar con Tags
 ```python
-# Crear grupo de tags
-tag_group_id = db.add_tag_group(
-    name='Lenguajes',
-    description='Tags de lenguajes de programación'
+# Los tags se pasan directamente al crear el item
+item_id = db.add_item(
+    category_id=category_id,
+    label='Mi Script Python',
+    content='import asyncio...',
+    item_type='CODE',
+    tags=['python', 'async', 'backend']  # Tags como lista
 )
 
-# Agregar tag a item
-db.add_tag_to_item(item_id, 'python')
-db.add_tag_to_item(item_id, 'async')
-
-# Obtener items por tag
-items = db.get_items_by_tag('python')
+# Los tags también se pueden actualizar
+db.update_item(
+    item_id=item_id,
+    tags=['python', 'async', 'backend', 'nuevo-tag']
+)
 ```
 
 ### Modificar Hotkey Global

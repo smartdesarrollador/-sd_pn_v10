@@ -220,6 +220,7 @@ class MainWindow(QMainWindow):
         self.sidebar.category_filter_clicked.connect(self.on_category_filter_clicked)
         self.sidebar.refresh_clicked.connect(self.on_refresh_clicked)
         self.sidebar.quick_create_clicked.connect(self.on_quick_create_clicked)
+        self.sidebar.web_static_create_clicked.connect(self.on_web_static_create_clicked)
         self.sidebar.pinned_panels_manager_clicked.connect(self.show_pinned_panels_manager)
         self.sidebar.create_process_clicked.connect(self.on_create_process_clicked)
         self.sidebar.view_processes_clicked.connect(self.on_view_processes_clicked)
@@ -1112,6 +1113,38 @@ class MainWindow(QMainWindow):
                 self,
                 "Error",
                 f"Error al abrir creación rápida:\n{str(e)}"
+            )
+
+    def on_web_static_create_clicked(self):
+        """Handle web static create button click - show WEB_STATIC wizard"""
+        try:
+            print("=" * 60)
+            print("DEBUG: on_web_static_create_clicked LLAMADO")
+            print("=" * 60)
+            logger.info("Web static create button clicked")
+
+            if not self.controller:
+                logger.error("No controller available")
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    "No se pudo acceder al controlador."
+                )
+                return
+
+            # Open the WEB_STATIC wizard via controller
+            print("DEBUG: Abriendo wizard...")
+            self.controller.open_create_web_static_wizard(parent=self)
+            print("DEBUG: Wizard cerrado")
+
+            logger.info("Web static wizard closed")
+
+        except Exception as e:
+            logger.error(f"Error in on_web_static_create_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir wizard WEB_STATIC:\n{str(e)}"
             )
 
     def on_quick_create_data_changed(self):

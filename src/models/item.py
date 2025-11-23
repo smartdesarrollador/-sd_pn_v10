@@ -12,6 +12,7 @@ class ItemType(Enum):
     URL = "url"
     CODE = "code"
     PATH = "path"
+    WEB_STATIC = "web_static"
 
 
 class Item:

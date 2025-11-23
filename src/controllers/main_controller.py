@@ -262,6 +262,32 @@ class MainController:
             logger.error(f"Error toggling browser: {e}", exc_info=True)
             raise
 
+    def open_create_web_static_wizard(self, parent=None):
+        """
+        Abre el wizard para crear items WEB_STATIC.
+
+        Args:
+            parent: Widget padre para el diálogo
+
+        Returns:
+            True si se creó un item exitosamente, False si no
+        """
+        try:
+            from views.dialogs.create_web_static_item_wizard import CreateWebStaticItemWizard
+
+            logger.info("Opening Create Web Static Item Wizard")
+            wizard = CreateWebStaticItemWizard(self, parent)
+
+            # Conectar señal de item creado para refrescar UI
+            wizard.item_created.connect(self.refresh_ui)
+
+            result = wizard.exec()
+            return result == wizard.DialogCode.Accepted
+
+        except Exception as e:
+            logger.error(f"Error opening web static wizard: {e}", exc_info=True)
+            raise
+
     def __del__(self):
         """Cleanup: close database connection and browser"""
         if hasattr(self, 'browser_manager'):

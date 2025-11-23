@@ -43,7 +43,7 @@ class QuickCreateDialog(QDialog):
     def init_ui(self):
         """Initialize the UI"""
         self.setWindowTitle("Creación Rápida")
-        self.setFixedSize(400, 250)
+        self.setFixedSize(400, 310)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint)
 
         # Main layout
@@ -70,6 +70,13 @@ class QuickCreateDialog(QDialog):
         self.create_item_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.create_item_button.clicked.connect(self.create_item)
         buttons_layout.addWidget(self.create_item_button)
+
+        # Create Web Static Item button (NUEVO)
+        self.create_web_static_button = QPushButton("🌐 Crear Item Web Estático")
+        self.create_web_static_button.setFixedHeight(60)
+        self.create_web_static_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.create_web_static_button.clicked.connect(self.create_web_static_item)
+        buttons_layout.addWidget(self.create_web_static_button)
 
         # Create Category button
         self.create_category_button = QPushButton("📁 Crear Categoría")
@@ -311,6 +318,38 @@ class QuickCreateDialog(QDialog):
                 self,
                 "Error",
                 f"Error al crear la categoría: {str(e)}"
+            )
+
+    def create_web_static_item(self):
+        """Create a new WEB_STATIC item using the wizard"""
+        if not self.controller:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "No se pudo acceder al controlador."
+            )
+            return
+
+        try:
+            logger.info("Opening Web Static Item Wizard from Quick Create")
+
+            # Cerrar este diálogo primero
+            self.accept()
+
+            # Abrir wizard
+            created = self.controller.open_create_web_static_wizard(parent=self.parent())
+
+            if created:
+                logger.info("Web Static item created successfully")
+                # Emitir señal para refrescar UI
+                self.data_changed.emit()
+
+        except Exception as e:
+            logger.error(f"Error opening web static wizard: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir el wizard: {str(e)}"
             )
 
     def on_item_created(self, category_id: str):

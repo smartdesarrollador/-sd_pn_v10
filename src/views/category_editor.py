@@ -385,25 +385,116 @@ class CategoryEditor(QWidget):
         self.delete_item_button.setEnabled(selected)
 
     def add_category(self):
-        """Add new category - saves directly to database"""
-        name, ok = QInputDialog.getText(
-            self,
-            "Nueva Categoría",
-            "Nombre de la categoría:"
-        )
+        """Add new category with optional tags - saves directly to database"""
+        # Create custom dialog for category with tags
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton
 
-        if not ok or not name.strip():
+        category_dialog = QDialog(self)
+        category_dialog.setWindowTitle("Nueva Categoría")
+        category_dialog.setFixedSize(450, 280)
+
+        dialog_layout = QVBoxLayout()
+        dialog_layout.setSpacing(10)
+        dialog_layout.setContentsMargins(25, 25, 25, 25)
+
+        # Name label and input
+        name_label = QLabel("Nombre de la categoría:")
+        dialog_layout.addWidget(name_label)
+
+        name_input = QLineEdit()
+        name_input.setPlaceholderText("Ej: Python, Docker, JavaScript...")
+        name_input.setMinimumHeight(35)
+        dialog_layout.addWidget(name_input)
+
+        # Add spacing
+        dialog_layout.addSpacing(10)
+
+        # Tags label and input (optional)
+        tags_label = QLabel("Tags (opcional):")
+        dialog_layout.addWidget(tags_label)
+
+        tags_input = QLineEdit()
+        tags_input.setPlaceholderText("backend, programacion, desarrollo...")
+        tags_input.setMinimumHeight(35)
+        dialog_layout.addWidget(tags_input)
+
+        # Add spacing before buttons
+        dialog_layout.addSpacing(15)
+
+        # Buttons
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(10)
+        ok_button = QPushButton("OK")
+        ok_button.setMinimumHeight(40)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.setMinimumHeight(40)
+
+        ok_button.clicked.connect(category_dialog.accept)
+        cancel_button.clicked.connect(category_dialog.reject)
+
+        buttons_layout.addWidget(ok_button)
+        buttons_layout.addWidget(cancel_button)
+        dialog_layout.addLayout(buttons_layout)
+
+        category_dialog.setLayout(dialog_layout)
+        category_dialog.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+            }
+            QLabel {
+                color: #ffffff;
+                font-size: 10pt;
+            }
+            QLineEdit {
+                background-color: #252525;
+                color: #ffffff;
+                border: 1px solid #00d4ff;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 10pt;
+            }
+            QLineEdit:focus {
+                border: 2px solid #00d4ff;
+            }
+            QPushButton {
+                background-color: #252525;
+                color: #ffffff;
+                border: 1px solid #00d4ff;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 10pt;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #00d4ff;
+                color: #000000;
+            }
+        """)
+
+        # Show dialog
+        if category_dialog.exec() != QDialog.DialogCode.Accepted:
+            logger.info("[ADD_CATEGORY] Dialog cancelled")
+            return
+
+        name = name_input.text().strip()
+        tags_text = tags_input.text().strip()
+
+        if not name:
             logger.info("[ADD_CATEGORY] Dialog cancelled or empty name")
             return
 
+        # Parse tags
+        tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()] if tags_text else []
+
         try:
-            logger.info(f"[ADD_CATEGORY] Creating new category: {name.strip()}")
+            logger.info(f"[ADD_CATEGORY] Creating new category: {name} with tags: {tags}")
 
             # Save directly to database to get real ID
             category_id = self.controller.config_manager.db.add_category(
-                name=name.strip(),
+                name=name,
                 icon="📁",  # Default icon
-                is_predefined=False
+                is_predefined=False,
+                tags=tags
             )
 
             if not category_id:
@@ -411,7 +502,7 @@ class CategoryEditor(QWidget):
                 QMessageBox.critical(
                     self,
                     "Error",
-                    f"No se pudo crear la categoría '{name.strip()}' en la base de datos."
+                    f"No se pudo crear la categoría '{name}' en la base de datos."
                 )
                 return
 

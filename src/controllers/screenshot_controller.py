@@ -267,6 +267,7 @@ class ScreenshotController(QObject):
                 screenshot_path=filepath,
                 categories=categories,
                 default_category_id=screenshots_category_id,
+                db=self.config_manager.db,
                 parent=self.main_window
             )
 

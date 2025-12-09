@@ -13,6 +13,12 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QFont
 from typing import Optional
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from views.widgets.project_tag_selector import ProjectTagSelector
+from core.global_tag_manager import GlobalTagManager
 
 
 class SaveScreenshotDialog(QDialog):
@@ -34,6 +40,7 @@ class SaveScreenshotDialog(QDialog):
                  screenshot_path: str,
                  categories: list,
                  default_category_id: Optional[int] = None,
+                 db=None,
                  parent=None):
         """
         Inicializar diálogo
@@ -42,6 +49,7 @@ class SaveScreenshotDialog(QDialog):
             screenshot_path: Ruta al archivo de screenshot guardado
             categories: Lista de categorías disponibles
             default_category_id: ID de categoría por defecto (Screenshots)
+            db: DBManager instance para gestionar tags
             parent: Widget padre
         """
         super().__init__(parent)
@@ -49,7 +57,11 @@ class SaveScreenshotDialog(QDialog):
         self.screenshot_path = screenshot_path
         self.categories = categories
         self.default_category_id = default_category_id
+        self.db = db
         self.item_data = None
+
+        # Inicializar GlobalTagManager si db está disponible
+        self.global_tag_manager = GlobalTagManager(self.db) if self.db else None
 
         self.init_ui()
         self.load_default_values()
@@ -208,9 +220,20 @@ class SaveScreenshotDialog(QDialog):
         item_layout.addRow("Descripción:", self.description_input)
 
         # Campo: Tags
-        self.tags_input = QLineEdit()
-        self.tags_input.setPlaceholderText("Separados por comas: bug, login, error")
-        item_layout.addRow("Tags:", self.tags_input)
+        tags_label = QLabel("Tags:")
+        item_layout.addRow(tags_label)
+
+        # Usar ProjectTagSelector si está disponible GlobalTagManager
+        if self.global_tag_manager:
+            self.tag_selector = ProjectTagSelector(self.global_tag_manager)
+            self.tag_selector.setMinimumHeight(150)
+            item_layout.addRow(self.tag_selector)
+        else:
+            # Fallback: campo de texto simple si no hay manager
+            self.tags_input = QLineEdit()
+            self.tags_input.setPlaceholderText("Separados por comas: bug, login, error")
+            item_layout.addRow(self.tags_input)
+            self.tag_selector = None
 
         # Campo: URL (opcional)
         self.url_input = QLineEdit()
@@ -274,7 +297,19 @@ class SaveScreenshotDialog(QDialog):
                     break
 
         # Tags por defecto
-        self.tags_input.setText("screenshot, captura")
+        if self.tag_selector and self.global_tag_manager:
+            # Crear/obtener tags por defecto y seleccionarlos
+            default_tag_names = ["screenshot", "captura"]
+            tag_ids = []
+            for tag_name in default_tag_names:
+                tag = self.global_tag_manager.create_tag(tag_name)
+                if tag:
+                    tag_ids.append(tag.id)
+            if tag_ids:
+                self.tag_selector.set_selected_tags(tag_ids)
+        elif hasattr(self, 'tags_input'):
+            # Fallback: campo de texto simple
+            self.tags_input.setText("screenshot, captura")
 
     def save_item(self):
         """Guardar item con datos ingresados"""
@@ -303,8 +338,21 @@ class SaveScreenshotDialog(QDialog):
 
         # Obtener datos
         description = self.description_input.toPlainText().strip()
-        tags_text = self.tags_input.text().strip()
-        tags = [tag.strip() for tag in tags_text.split(',') if tag.strip()]
+
+        # Obtener tags del ProjectTagSelector o del campo de texto fallback
+        tags = []
+        if self.tag_selector and self.global_tag_manager:
+            # Convertir IDs de tags a nombres
+            selected_ids = self.tag_selector.get_selected_tags()
+            for tag_id in selected_ids:
+                tag = self.global_tag_manager.get_tag(tag_id)
+                if tag:
+                    tags.append(tag.name)
+        elif hasattr(self, 'tags_input'):
+            # Fallback: campo de texto simple
+            tags_text = self.tags_input.text().strip()
+            tags = [tag.strip() for tag in tags_text.split(',') if tag.strip()]
+
         is_favorite = self.favorite_checkbox.isChecked()
         url = self.url_input.text().strip()
 

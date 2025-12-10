@@ -756,24 +756,35 @@ class BulkItemCreatorDialog(QWidget):
 
     # === POSICIONAMIENTO ===
 
-    def position_window(self):
+    def position_window(self, sidebar_window=None):
         """Posicionar ventana a la izquierda del sidebar, completamente pegada"""
         try:
-            # Obtener geometría de la pantalla
+            if sidebar_window:
+                # Método 1: Usar posición real del sidebar (como FloatingPanel)
+                sidebar_x = sidebar_window.x()
+                sidebar_y = sidebar_window.y()
+
+                # Posicionar justo a la izquierda del sidebar, sin gap
+                x = sidebar_x - CREATOR_WIDTH
+                y = sidebar_y
+            else:
+                # Método 2: Fallback - calcular basado en geometría de pantalla
+                screen = QApplication.primaryScreen()
+                if not screen:
+                    logger.warning("No se pudo obtener pantalla")
+                    return
+
+                screen_geometry = screen.availableGeometry()
+                sidebar_width = 70
+                x = screen_geometry.width() - CREATOR_WIDTH - sidebar_width
+                y = screen_geometry.y()
+
+            # Obtener altura de pantalla
             screen = QApplication.primaryScreen()
-            if not screen:
-                logger.warning("No se pudo obtener pantalla")
-                return
-
-            screen_geometry = screen.availableGeometry()
-
-            # Calcular posición exacta
-            # El sidebar está en: screen_width - 70
-            # El creador debe estar EXACTAMENTE pegado, sin gap
-            # Posición: screen_width - 70 (sidebar) - 450 (creador) = screen_width - 520
-            x = screen_geometry.x() + screen_geometry.width() - 520  # 520 = 450 (creador) + 70 (sidebar)
-            y = screen_geometry.y()
-            height = screen_geometry.height()
+            if screen:
+                height = screen.availableGeometry().height()
+            else:
+                height = CREATOR_MIN_HEIGHT
 
             self.setGeometry(x, y, CREATOR_WIDTH, height)
             logger.info(f"Ventana posicionada (pegada al sidebar): x={x}, y={y}, w={CREATOR_WIDTH}, h={height}")
@@ -864,7 +875,8 @@ class BulkItemCreatorDialog(QWidget):
         """Cuando la ventana se muestra"""
         super().showEvent(event)
         # Posicionar y registrar AppBar con delay
-        QTimer.singleShot(100, self.position_window)
+        # Pasar referencia al sidebar (parent) para posicionamiento correcto
+        QTimer.singleShot(100, lambda: self.position_window(self.parent()))
         QTimer.singleShot(200, self.register_appbar)
         logger.debug("BulkItemCreatorDialog shown - registering AppBar")
 

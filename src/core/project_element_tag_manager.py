@@ -818,21 +818,58 @@ class ProjectElementTagManager(QObject):
 
     def get_tags_for_area(self, area_id: int) -> List[Any]:
         """
-        Obtiene los tags asociados a un área.
-        Intenta usar tabla area_element_tags si existe (por nombre de tabla indicado por usuario).
-        Retorna lista de objetos con atributo .name o dicts.
+        Obtiene los tags únicos usados en un área específica.
+        Recopila tags de relaciones y componentes del área desde tablas:
+        - area_element_tags (definición)
+        - area_relations, area_components
+        - area_element_tag_associations (asociaciones)
+        
+        Args:
+            area_id: ID del área
+            
+        Returns:
+            Lista de objetos tag (construidos desde area_element_tags)
         """
         try:
-            # Intento 1: Tabla area_element_tags como junction (tags existen en tags table)
-            query = """
-                SELECT t.*
-                FROM tags t
-                JOIN area_element_tags aet ON t.id = aet.tag_id
-                WHERE aet.area_id = ?
-                ORDER BY t.name
-            """
-            results = self.db.execute_query(query, (area_id,))
-            return [create_tag_from_db_row(row) for row in results]
-        except Exception:
-            # Fallback: Si no existe tabla, retornar vacío por ahora
+            # Recopilar IDs de tags únicos para evitar duplicados
+            tag_ids = set()
+            tags_map = {}  # id -> tag_data
+            
+            # 1. Obtener tags de relaciones del área
+            relations = self.db.get_area_relations(area_id)
+            for relation in relations:
+                tags_data = self.db.get_tags_for_area_relation(relation['id'])
+                for tag_data in tags_data:
+                    if tag_data['id'] not in tag_ids:
+                        tag_ids.add(tag_data['id'])
+                        tags_map[tag_data['id']] = tag_data
+
+            # 2. Obtener tags de componentes del área
+            components = self.db.get_area_components(area_id)
+            for component in components:
+                tags_data = self.db.get_tags_for_area_component(component['id'])
+                for tag_data in tags_data:
+                    if tag_data['id'] not in tag_ids:
+                        tag_ids.add(tag_data['id'])
+                        tags_map[tag_data['id']] = tag_data
+            
+            # Convertir a objetos Tag (usando create_tag_from_db_row)
+            # Nota: create_tag_from_db_row espera dict con claves estándar (id, name, color, etc.)
+            # area_element_tags tiene esa estructura compatible.
+            valid_tags = []
+            for tag_id in tag_ids:
+                tag_data = tags_map[tag_id]
+                try:
+                    tag = create_tag_from_db_row(tag_data)
+                    valid_tags.append(tag)
+                except Exception as e:
+                    logger.warning(f"Error convirtiendo tag de área {tag_id}: {e}")
+            
+            # Ordenar alfabéticamente
+            valid_tags.sort(key=lambda t: t.name.lower())
+            
+            return valid_tags
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo tags del área {area_id}: {e}")
             return []

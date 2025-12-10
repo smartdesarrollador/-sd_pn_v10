@@ -2108,6 +2108,46 @@ class DBManager:
         """
         return self.execute_query(sql_query, (search_pattern,))
 
+    def get_area_relations(self, area_id: int) -> List[Dict]:
+        """
+        Get all relations for an area
+        """
+        query = "SELECT * FROM area_relations WHERE area_id = ? ORDER BY order_index"
+        return self.execute_query(query, (area_id,))
+
+    def get_area_components(self, area_id: int) -> List[Dict]:
+        """
+        Get all components for an area
+        """
+        query = "SELECT * FROM area_components WHERE area_id = ? ORDER BY order_index"
+        return self.execute_query(query, (area_id,))
+
+    def get_tags_for_area_relation(self, relation_id: int) -> List[Dict]:
+        """
+        Get tags for an area relation
+        """
+        query = """
+            SELECT t.*
+            FROM area_element_tags t
+            JOIN area_element_tag_associations a ON t.id = a.tag_id
+            WHERE a.area_relation_id = ?
+            ORDER BY t.name
+        """
+        return self.execute_query(query, (relation_id,))
+
+    def get_tags_for_area_component(self, component_id: int) -> List[Dict]:
+        """
+        Get tags for an area component
+        """
+        query = """
+            SELECT t.*
+            FROM area_element_tags t
+            JOIN area_element_tag_associations a ON t.id = a.tag_id
+            WHERE a.area_component_id = ?
+            ORDER BY t.name
+        """
+        return self.execute_query(query, (component_id,))
+
     def get_tag_statistics(self) -> Dict:
         """
         Get tag statistics

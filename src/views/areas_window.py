@@ -23,6 +23,7 @@ from src.views.widgets.area_relation_widget import AreaRelationWidget
 from src.views.widgets.area_component_widget import AreaComponentWidget
 from src.views.widgets.area_card_widget import AreaCardWidget
 from src.views.widgets.responsive_card_grid import ResponsiveCardGrid
+from src.views.area_manager.area_full_view_panel import AreaFullViewPanel
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class AreasWindow(QMainWindow):
         self.area_manager = AreaManager(db_manager)
         self.export_manager = AreaExportManager(db_manager)
         self.current_area_id = None
-        self._view_mode = 'edit'  # 'edit' o 'clean'
+        self._view_mode = 'edit'  # 'edit', 'clean', o 'full'
         self._selected_insert_position = None  # (item_type, item_id, order_index) del elemento seleccionado
 
         # Estado de paneles laterales
@@ -261,6 +262,13 @@ class AreasWindow(QMainWindow):
         self.mode_toggle_btn.setToolTip("Vista Limpia")
         header_layout.addWidget(self.mode_toggle_btn)
 
+        # Botón Vista Completa
+        self.full_view_btn = QPushButton("📄")
+        self.full_view_btn.setFixedSize(40, 40)
+        self.full_view_btn.clicked.connect(self.switch_to_full_view)
+        self.full_view_btn.setToolTip("Vista Completa")
+        header_layout.addWidget(self.full_view_btn)
+
         layout.addLayout(header_layout)
 
         # Descripción
@@ -271,6 +279,9 @@ class AreasWindow(QMainWindow):
         # Toolbar (solo en modo edición)
         self.toolbar = self._create_toolbar()
         layout.addWidget(self.toolbar)
+
+        # Stacked Widget para alternar entre modos
+        self.view_stack = QStackedWidget()
 
         # Canvas scrollable para modo edición (lista vertical)
         scroll = QScrollArea()
@@ -284,12 +295,17 @@ class AreasWindow(QMainWindow):
 
         scroll.setWidget(self.canvas_widget)
         self.edit_mode_container = scroll
-        layout.addWidget(self.edit_mode_container)
+        self.view_stack.addWidget(self.edit_mode_container)  # Index 0
 
         # Grid responsive para modo limpio (cards)
         self.clean_mode_grid = ResponsiveCardGrid()
-        self.clean_mode_grid.setVisible(False)  # Oculto por defecto
-        layout.addWidget(self.clean_mode_grid)
+        self.view_stack.addWidget(self.clean_mode_grid)  # Index 1
+
+        # Panel de vista completa
+        self.full_view_panel = AreaFullViewPanel(self.db)
+        self.view_stack.addWidget(self.full_view_panel)  # Index 2
+
+        layout.addWidget(self.view_stack)
 
         # Botones inferiores (solo en modo edición)
         self.bottom_buttons = QWidget()
@@ -517,10 +533,13 @@ class AreasWindow(QMainWindow):
                     self._add_relation_widget(item)
                 else:  # component
                     self._add_component_widget(item)
-        else:
+        elif self._view_mode == 'clean':
             # Modo limpio: usar cards en grid
             for item in content:
                 self._add_card_widget(item)
+        elif self._view_mode == 'full':
+            # Modo vista completa: delegar al panel
+            self.full_view_panel.load_area(area_id)
 
     def _clear_canvas(self):
         """Limpia el canvas eliminando todos los widgets"""
@@ -1015,7 +1034,7 @@ class AreasWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Error al abrir panel de items:\n{str(e)}")
 
     def toggle_view_mode(self):
-        """Alterna entre Modo Edición y Modo Vista Amigable"""
+        """Alterna entre modos: Edit -> Clean -> Edit"""
         if self._view_mode == 'edit':
             self._view_mode = 'clean'
             self._apply_clean_view_mode()
@@ -1023,16 +1042,24 @@ class AreasWindow(QMainWindow):
             self._view_mode = 'edit'
             self._apply_edit_view_mode()
 
+    def switch_to_full_view(self):
+        """Cambia a modo Vista Completa"""
+        if self._view_mode == 'full':
+            self._view_mode = 'edit'
+            self._apply_edit_view_mode()
+        else:
+            self._view_mode = 'full'
+            self._apply_full_view_mode()
+
     def _apply_edit_view_mode(self):
         """Aplica estilo de Modo Edición"""
         self.toolbar.setVisible(True)
         self.bottom_buttons.setVisible(True)
         self.mode_toggle_btn.setText("👁️")
         self.mode_toggle_btn.setToolTip("Vista Limpia")
+        self.full_view_btn.setStyleSheet("")
 
-        # Mostrar container de modo edición, ocultar grid
-        self.edit_mode_container.setVisible(True)
-        self.clean_mode_grid.setVisible(False)
+        self.view_stack.setCurrentIndex(0)
 
         if self.current_area_id:
             self.load_area(self.current_area_id)
@@ -1043,13 +1070,30 @@ class AreasWindow(QMainWindow):
         self.bottom_buttons.setVisible(False)
         self.mode_toggle_btn.setText("📝")
         self.mode_toggle_btn.setToolTip("Modo Edición")
+        self.full_view_btn.setStyleSheet("")
 
-        # Ocultar container de modo edición, mostrar grid
-        self.edit_mode_container.setVisible(False)
-        self.clean_mode_grid.setVisible(True)
+        self.view_stack.setCurrentIndex(1)
 
         if self.current_area_id:
             self.load_area(self.current_area_id)
+
+    def _apply_full_view_mode(self):
+        """Aplica estilo de Modo Vista Completa"""
+        self.toolbar.setVisible(False)
+        self.bottom_buttons.setVisible(False)
+        self.mode_toggle_btn.setText("📝")
+        self.mode_toggle_btn.setToolTip("Modo Edición")
+        self.full_view_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9b59b6;
+                color: #ffffff;
+            }
+        """)
+
+        self.view_stack.setCurrentIndex(2)
+
+        if self.current_area_id:
+            self.full_view_panel.load_area(self.current_area_id)
 
     def add_element_to_area(self, entity_type: str):
         """Agrega un elemento al área"""
@@ -1236,7 +1280,13 @@ class AreasWindow(QMainWindow):
 
         # Recargar área con filtros
         if self.current_area_id:
-            self.load_area(self.current_area_id)
+            if self._view_mode == 'full':
+                # Aplicar filtros al panel de vista completa
+                tag_names = [self.tag_manager.get_tag_by_id(tid).name for tid in tag_ids if self.tag_manager.get_tag_by_id(tid)]
+                match_mode = 'AND' if match_all else 'OR'
+                self.full_view_panel.apply_filters(tag_names, match_mode)
+            else:
+                self.load_area(self.current_area_id)
 
     def on_refresh_area(self):
         """Recarga el área actual sin cerrar la ventana"""

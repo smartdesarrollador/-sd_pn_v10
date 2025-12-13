@@ -68,7 +68,8 @@
       "Bash(if not exist \"src\\views\\project_manager\\widgets\\headers\" mkdir \"src\\views\\project_manager\\widgets\\headers\")",
       "Bash(if not exist \"src\\views\\project_manager\\widgets\\items\" mkdir \"src\\views\\project_manager\\widgets\\items\")",
       "Bash(if not exist \"src\\views\\project_manager\\widgets\\common\" mkdir \"src\\views\\project_manager\\widgets\\common\")",
-      "Bash(if not exist \"src\\views\\project_manager\\styles\" mkdir \"src\\views\\project_manager\\styles\")"
+      "Bash(if not exist \"src\\views\\project_manager\\styles\" mkdir \"src\\views\\project_manager\\styles\")",
+      "Bash(if not exist \"src\\views\\area_manager\" mkdir \"src\\views\\area_manager\")"
     ],
     "deny": [],
     "ask": []

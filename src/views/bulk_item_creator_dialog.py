@@ -1002,6 +1002,47 @@ class BulkItemCreatorDialog(QWidget):
 
                 logger.debug(f"Tag '{project_tag_name}' asociado a relación")
 
+            # Paso 6: Guardar orden en filtered_order para cada tag
+            for project_tag_name in draft.project_element_tags:
+                if is_project:
+                    project_tag = self.db.get_project_element_tag_by_name(project_tag_name)
+                    project_tag_id = project_tag['id'] if project_tag else None
+
+                    if project_tag_id:
+                        # Obtener el max order_index actual
+                        filtered_orders = self.db.get_filtered_order(draft.project_id, project_tag_id)
+                        max_order = max(filtered_orders.values()) if filtered_orders else -1
+                        next_order = max_order + 1
+
+                        # Guardar el orden
+                        self.db.update_filtered_order(
+                            draft.project_id,
+                            project_tag_id,
+                            'relation',
+                            relation_id,
+                            next_order
+                        )
+                        logger.debug(f"Orden guardado para tag '{project_tag_name}': {next_order}")
+                else:
+                    area_tag = self.db.get_area_element_tag_by_name(project_tag_name)
+                    area_tag_id = area_tag['id'] if area_tag else None
+
+                    if area_tag_id:
+                        # Obtener el max order_index actual
+                        filtered_orders = self.db.get_area_filtered_order(draft.area_id, area_tag_id)
+                        max_order = max(filtered_orders.values()) if filtered_orders else -1
+                        next_order = max_order + 1
+
+                        # Guardar el orden
+                        self.db.update_area_filtered_order(
+                            draft.area_id,
+                            area_tag_id,
+                            'relation',
+                            relation_id,
+                            next_order
+                        )
+                        logger.debug(f"Orden guardado para tag '{project_tag_name}': {next_order}")
+
             logger.info(f"✓ Modo TAG ESPECIAL: {saved_count} items + relación {entity_name.lower()}")
 
         except Exception as e:
@@ -1109,6 +1150,47 @@ class BulkItemCreatorDialog(QWidget):
                     self.db.assign_tag_to_area_relation(relation_id, area_tag_id)
 
                 logger.debug(f"Tag '{project_tag_name}' asociado a lista")
+
+            # Paso 5: Guardar orden en filtered_order para cada tag
+            for project_tag_name in draft.project_element_tags:
+                if is_project:
+                    project_tag = self.db.get_project_element_tag_by_name(project_tag_name)
+                    project_tag_id = project_tag['id'] if project_tag else None
+
+                    if project_tag_id:
+                        # Obtener el max order_index actual
+                        filtered_orders = self.db.get_filtered_order(draft.project_id, project_tag_id)
+                        max_order = max(filtered_orders.values()) if filtered_orders else -1
+                        next_order = max_order + 1
+
+                        # Guardar el orden
+                        self.db.update_filtered_order(
+                            draft.project_id,
+                            project_tag_id,
+                            'relation',
+                            relation_id,
+                            next_order
+                        )
+                        logger.debug(f"Orden guardado para tag '{project_tag_name}': {next_order}")
+                else:
+                    area_tag = self.db.get_area_element_tag_by_name(project_tag_name)
+                    area_tag_id = area_tag['id'] if area_tag else None
+
+                    if area_tag_id:
+                        # Obtener el max order_index actual
+                        filtered_orders = self.db.get_area_filtered_order(draft.area_id, area_tag_id)
+                        max_order = max(filtered_orders.values()) if filtered_orders else -1
+                        next_order = max_order + 1
+
+                        # Guardar el orden
+                        self.db.update_area_filtered_order(
+                            draft.area_id,
+                            area_tag_id,
+                            'relation',
+                            relation_id,
+                            next_order
+                        )
+                        logger.debug(f"Orden guardado para tag '{project_tag_name}': {next_order}")
 
             logger.info(f"✓ Modo LISTA: {saved_count} items + relación {entity_name.lower()}")
 

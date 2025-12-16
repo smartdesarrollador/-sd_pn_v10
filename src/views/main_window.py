@@ -28,6 +28,7 @@ from views.dialogs.stats_dashboard import StatsDashboard
 from views.dialogs.panel_config_dialog import PanelConfigDialog
 from views.dialogs.quick_create_dialog import QuickCreateDialog
 from views.dialogs.table_creator_wizard import TableCreatorWizard
+from views.dialogs.universal_search_dialog import UniversalSearchDialog
 from views.item_editor_dialog import ItemEditorDialog
 from views.category_filter_window import CategoryFilterWindow
 from models.item import Item
@@ -79,6 +80,7 @@ class MainWindow(QMainWindow):
         self.pinned_panels_window = None  # Ventana de gestión de paneles anclados
         self.global_search_panel = None  # Ventana flotante para búsqueda global
         self.advanced_search_window = None  # Ventana de búsqueda avanzada
+        self.universal_search_dialog = None  # Ventana de búsqueda universal
         self.favorites_panel = None  # Ventana flotante para favoritos
         self.stats_panel = None  # Ventana flotante para estadísticas
         self.structure_dashboard = None  # Dashboard de estructura (no-modal)
@@ -206,9 +208,11 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         self.sidebar.set_controller(self.controller)  # Set controller reference for notebook
         self.sidebar.category_clicked.connect(self.on_category_clicked)
-        self.sidebar.global_search_clicked.connect(self.on_global_search_clicked)
+        # Usar búsqueda universal en lugar de global search
+        self.sidebar.global_search_clicked.connect(self.show_universal_search)
         self.sidebar.screenshot_clicked.connect(self.on_screenshot_clicked)
         self.sidebar.advanced_search_clicked.connect(self.on_advanced_search_clicked)
+        self.sidebar.universal_search_clicked.connect(self.show_universal_search)
         self.sidebar.image_gallery_clicked.connect(self.on_image_gallery_clicked)
         self.sidebar.projects_clicked.connect(self.on_projects_clicked)
         self.sidebar.areas_clicked.connect(self.on_areas_clicked)
@@ -498,6 +502,246 @@ class MainWindow(QMainWindow):
         if self.global_search_panel:
             self.global_search_panel.deleteLater()
             self.global_search_panel = None
+
+    def show_universal_search(self):
+        """Muestra la ventana de búsqueda universal"""
+        try:
+            logger.info("Opening universal search dialog")
+
+            # Cerrar si ya está abierta
+            if self.universal_search_dialog and self.universal_search_dialog.isVisible():
+                self.universal_search_dialog.close()
+                self.universal_search_dialog = None
+                return
+
+            # Crear el diálogo
+            db_manager = self.config_manager.db if self.config_manager else None
+            self.universal_search_dialog = UniversalSearchDialog(
+                db_manager=db_manager,
+                parent=self
+            )
+
+            # Conectar señales
+            self.universal_search_dialog.item_selected.connect(self.on_item_clicked)
+            self.universal_search_dialog.item_copied.connect(self.on_universal_search_item_copied)
+            self.universal_search_dialog.edit_item_requested.connect(self.on_edit_item_from_universal_search)
+            self.universal_search_dialog.delete_item_requested.connect(self.on_delete_item_from_universal_search)
+            self.universal_search_dialog.toggle_favorite_requested.connect(self.on_toggle_favorite_from_universal_search)
+            self.universal_search_dialog.navigate_to_category_requested.connect(self.on_category_clicked)
+            self.universal_search_dialog.navigate_to_project_requested.connect(self.on_navigate_to_project)
+            self.universal_search_dialog.navigate_to_area_requested.connect(self.on_navigate_to_area)
+
+            # Mostrar
+            self.universal_search_dialog.show()
+            self.universal_search_dialog.activateWindow()
+            self.universal_search_dialog.focus_search_bar()
+
+            logger.debug("Universal search dialog opened")
+
+        except Exception as e:
+            logger.error(f"Error opening universal search dialog: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir búsqueda universal:\n{str(e)}\n\nRevisa widget_sidebar_error.log"
+            )
+
+    def on_universal_search_item_copied(self, item_id):
+        """Handler cuando se copia un item desde la búsqueda universal"""
+        logger.info(f"Item {item_id} copiado desde búsqueda universal")
+        # Actualizar contador de uso si es necesario
+        if self.config_manager and self.config_manager.db:
+            try:
+                self.config_manager.db.update_last_used(item_id)
+            except Exception as e:
+                logger.error(f"Error actualizando uso del item: {e}")
+
+    def on_edit_item_from_universal_search(self, item_id: int):
+        """Handler para editar un item desde la búsqueda universal"""
+        try:
+            logger.info(f"Edit requested for item ID: {item_id} from universal search")
+
+            if not self.controller or not self.config_manager:
+                logger.error("No controller or config_manager available")
+                return
+
+            # Obtener el item completo desde la BD
+            db = self.config_manager.db
+            item_data = db.get_item_by_id(item_id)
+
+            if not item_data:
+                logger.error(f"Item {item_id} not found")
+                QMessageBox.warning(self, "Error", "Item no encontrado")
+                return
+
+            # Crear objeto Item desde dict
+            from models.item import Item
+            item = Item(
+                id=item_data['id'],
+                label=item_data['label'],
+                content=item_data['content'],
+                item_type=item_data.get('item_type', 'TEXT'),
+                category_id=item_data.get('category_id'),
+                is_sensitive=item_data.get('is_sensitive', False),
+                description=item_data.get('description', ''),
+                tags=item_data.get('tags', [])
+            )
+
+            # Abrir ItemEditorDialog
+            dialog = ItemEditorDialog(
+                item=item,
+                category_id=item.category_id,
+                controller=self.controller,
+                parent=self
+            )
+
+            # Conectar señales para refrescar resultados de búsqueda
+            dialog.item_updated.connect(lambda item_id, cat_id: self._refresh_universal_search_results())
+
+            dialog.exec()
+
+        except Exception as e:
+            logger.error(f"Error editing item from universal search: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Error al editar item:\n{str(e)}")
+
+    def on_delete_item_from_universal_search(self, item_id: int):
+        """Handler para eliminar un item desde la búsqueda universal"""
+        try:
+            logger.info(f"Delete requested for item ID: {item_id} from universal search")
+
+            if not self.config_manager:
+                logger.error("No config_manager available")
+                return
+
+            # Confirmar eliminación
+            reply = QMessageBox.question(
+                self,
+                "Confirmar eliminación",
+                "¿Estás seguro de que deseas eliminar este item?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                db = self.config_manager.db
+                db.delete_item(item_id)
+                logger.info(f"Item {item_id} deleted successfully")
+
+                # Refrescar búsqueda universal
+                self._refresh_universal_search_results()
+
+                # Refrescar floating panel si está visible
+                if self.floating_panel and self.floating_panel.isVisible():
+                    self.floating_panel.reload_items()
+
+                QMessageBox.information(self, "Éxito", "Item eliminado correctamente")
+
+        except Exception as e:
+            logger.error(f"Error deleting item from universal search: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Error al eliminar item:\n{str(e)}")
+
+    def on_toggle_favorite_from_universal_search(self, item_id: int):
+        """Handler para toggle favorite de un item desde la búsqueda universal"""
+        try:
+            logger.info(f"Toggle favorite requested for item ID: {item_id} from universal search")
+
+            if not self.config_manager:
+                logger.error("No config_manager available")
+                return
+
+            db = self.config_manager.db
+
+            # Obtener estado actual
+            item_data = db.get_item_by_id(item_id)
+            if not item_data:
+                logger.error(f"Item {item_id} not found")
+                return
+
+            current_favorite = item_data.get('is_favorite', False)
+            new_favorite = not current_favorite
+
+            # Actualizar en BD
+            db.update_item(item_id, is_favorite=new_favorite)
+            logger.info(f"Item {item_id} favorite status changed to {new_favorite}")
+
+            # Refrescar búsqueda universal
+            self._refresh_universal_search_results()
+
+            # Refrescar floating panel si está visible
+            if self.floating_panel and self.floating_panel.isVisible():
+                self.floating_panel.reload_items()
+
+            # Refrescar favorites panel si está visible
+            if self.favorites_panel and self.favorites_panel.isVisible():
+                self.favorites_panel.refresh()
+
+        except Exception as e:
+            logger.error(f"Error toggling favorite from universal search: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Error al cambiar estado de favorito:\n{str(e)}")
+
+    def on_navigate_to_project(self, project_id: int):
+        """Handler para navegar a un proyecto específico desde la búsqueda universal"""
+        try:
+            logger.info(f"Navigate to project ID: {project_id} from universal search")
+
+            if not self.controller or not self.config_manager:
+                logger.error("No controller or config_manager available")
+                return
+
+            # Abrir ventana de proyectos si no está abierta
+            if not hasattr(self, 'projects_window') or not self.projects_window or not self.projects_window.isVisible():
+                self.on_projects_clicked()
+
+            # Si la ventana tiene método para seleccionar proyecto, usarlo
+            if hasattr(self.projects_window, 'select_project'):
+                self.projects_window.select_project(project_id)
+
+            # Traer ventana al frente
+            if self.projects_window:
+                self.projects_window.raise_()
+                self.projects_window.activateWindow()
+
+        except Exception as e:
+            logger.error(f"Error navigating to project: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Error al navegar al proyecto:\n{str(e)}")
+
+    def on_navigate_to_area(self, area_id: int):
+        """Handler para navegar a un área específica desde la búsqueda universal"""
+        try:
+            logger.info(f"Navigate to area ID: {area_id} from universal search")
+
+            if not self.controller or not self.config_manager:
+                logger.error("No controller or config_manager available")
+                return
+
+            # Abrir ventana de áreas si no está abierta
+            if not hasattr(self, 'areas_window') or not self.areas_window or not self.areas_window.isVisible():
+                self.on_areas_clicked()
+
+            # Si la ventana tiene método para seleccionar área, usarlo
+            if hasattr(self.areas_window, 'select_area'):
+                self.areas_window.select_area(area_id)
+
+            # Traer ventana al frente
+            if self.areas_window:
+                self.areas_window.raise_()
+                self.areas_window.activateWindow()
+
+        except Exception as e:
+            logger.error(f"Error navigating to area: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Error al navegar al área:\n{str(e)}")
+
+    def _refresh_universal_search_results(self):
+        """Refrescar los resultados de la búsqueda universal"""
+        try:
+            if self.universal_search_dialog and self.universal_search_dialog.isVisible():
+                # Llamar al método de refresh del diálogo si existe
+                if hasattr(self.universal_search_dialog, 'refresh_results'):
+                    self.universal_search_dialog.refresh_results()
+                elif hasattr(self.universal_search_dialog, 'perform_search'):
+                    self.universal_search_dialog.perform_search()
+        except Exception as e:
+            logger.error(f"Error refreshing universal search results: {e}", exc_info=True)
 
     def on_global_search_pin_state_changed(self, is_pinned: bool):
         """Handle global search panel pin state change via signal"""

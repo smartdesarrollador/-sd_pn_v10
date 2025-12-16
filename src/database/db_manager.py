@@ -30,6 +30,7 @@ class DBManager:
         """
         self.db_path = Path(db_path)
         self.connection = None
+        self._fts5_available = None  # Caché para verificación de FTS5
         self._ensure_database()
         logger.info(f"Database initialized at: {self.db_path}")
 
@@ -8694,6 +8695,637 @@ class DBManager:
         except Exception as e:
             logger.error(f"Error actualizando timestamp de borrador {tab_id}: {e}")
             return False
+
+    # ==================== Universal Search ====================
+
+    def _check_fts5_available(self) -> bool:
+        """
+        Verifica si FTS5 está disponible (con caché)
+
+        Returns:
+            bool: True si FTS5 está disponible
+        """
+        if self._fts5_available is not None:
+            return self._fts5_available
+
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='items_fts'
+            """)
+            self._fts5_available = cursor.fetchone() is not None
+            logger.debug(f"FTS5 available: {self._fts5_available}")
+            return self._fts5_available
+        except Exception as e:
+            logger.error(f"Error checking FTS5 availability: {e}")
+            self._fts5_available = False
+            return False
+
+    def universal_search_items(self, query: str, limit: int = 1000, offset: int = 0) -> List[Dict]:
+        """
+        Búsqueda universal de items con FTS5 incluyendo TODAS las relaciones
+
+        Args:
+            query: Texto de búsqueda (usa FTS5 si disponible, sino LIKE)
+            limit: Límite de resultados
+            offset: Número de resultados a saltar (para paginación)
+
+        Returns:
+            List[Dict]: Items con todas sus relaciones (proyectos, areas, categorias, etc.)
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            # Verificar si existe FTS5 (con caché)
+            has_fts = self._check_fts5_available()
+
+            if has_fts and query.strip():
+                # Usar FTS5 para búsqueda rápida
+                # Usar búsqueda sin comillas para permitir coincidencias parciales
+                search_query = f'{query}*'  # Búsqueda flexible (sin comillas)
+
+                query_sql = """
+                WITH item_results AS (
+                    SELECT DISTINCT
+                        i.id,
+                        i.label,
+                        i.content,
+                        i.icon,
+                        i.type,
+                        i.use_count,
+                        i.created_at,
+                        i.updated_at,
+                        i.last_used,
+                        i.tags,
+                        i.description,
+                        i.color,
+                        i.is_sensitive,
+                        i.is_favorite,
+                        -- Relación directa con categoría
+                        c.name as categoria_name,
+                        c.id as categoria_id,
+                        -- Relación directa con lista
+                        l.name as lista_name,
+                        l.id as lista_id,
+                        -- Relación directa con tabla
+                        t.name as tabla_name,
+                        t.id as tabla_id
+                    FROM items i
+                    LEFT JOIN categories c ON i.category_id = c.id
+                    LEFT JOIN listas l ON i.list_id = l.id
+                    LEFT JOIN tables t ON i.table_id = t.id
+                    WHERE i.id IN (
+                        SELECT item_id FROM items_fts
+                        WHERE items_fts MATCH ?
+                    )
+                    AND i.is_active = 1
+                )
+                SELECT
+                    ir.*,
+                    -- Proyectos vinculados
+                    GROUP_CONCAT(DISTINCT p.name) as proyectos,
+                    -- Áreas vinculadas
+                    GROUP_CONCAT(DISTINCT a.name) as areas,
+                    -- Procesos vinculados
+                    GROUP_CONCAT(DISTINCT proc.name) as procesos
+                FROM item_results ir
+                -- Join con proyectos vía project_relations
+                LEFT JOIN project_relations pr ON pr.entity_type = 'item' AND pr.entity_id = ir.id
+                LEFT JOIN proyectos p ON pr.project_id = p.id
+                -- Join con áreas vía area_relations
+                LEFT JOIN area_relations ar ON ar.entity_type = 'item' AND ar.entity_id = ir.id
+                LEFT JOIN areas a ON ar.area_id = a.id
+                -- Join con procesos vía process_items
+                LEFT JOIN process_items pi ON pi.item_id = ir.id
+                LEFT JOIN processes proc ON pi.process_id = proc.id
+                GROUP BY ir.id
+                ORDER BY ir.use_count DESC, ir.updated_at DESC
+                LIMIT ? OFFSET ?
+                """
+                try:
+                    cursor.execute(query_sql, (search_query, limit, offset))
+                except sqlite3.OperationalError as e:
+                    # Si hay error de sintaxis FTS5, hacer fallback a LIKE
+                    logger.warning(f"FTS5 query error, fallback to LIKE: {e}")
+                    has_fts = False  # Forzar uso de LIKE
+
+            if not has_fts or not query.strip():
+                # Fallback a búsqueda LIKE si no hay FTS5 o query vacío
+                search_pattern = f"%{query}%" if query.strip() else "%"
+
+                query_sql = """
+                WITH item_results AS (
+                    SELECT DISTINCT
+                        i.id,
+                        i.label,
+                        i.content,
+                        i.icon,
+                        i.type,
+                        i.use_count,
+                        i.created_at,
+                        i.updated_at,
+                        i.last_used,
+                        i.tags,
+                        i.description,
+                        i.color,
+                        i.is_sensitive,
+                        i.is_favorite,
+                        c.name as categoria_name,
+                        c.id as categoria_id,
+                        l.name as lista_name,
+                        l.id as lista_id,
+                        t.name as tabla_name,
+                        t.id as tabla_id
+                    FROM items i
+                    LEFT JOIN categories c ON i.category_id = c.id
+                    LEFT JOIN listas l ON i.list_id = l.id
+                    LEFT JOIN tables t ON i.table_id = t.id
+                    WHERE (i.label LIKE ? OR i.content LIKE ? OR i.description LIKE ?)
+                    AND i.is_active = 1
+                )
+                SELECT
+                    ir.*,
+                    GROUP_CONCAT(DISTINCT p.name) as proyectos,
+                    GROUP_CONCAT(DISTINCT a.name) as areas,
+                    GROUP_CONCAT(DISTINCT proc.name) as procesos
+                FROM item_results ir
+                LEFT JOIN project_relations pr ON pr.entity_type = 'item' AND pr.entity_id = ir.id
+                LEFT JOIN proyectos p ON pr.project_id = p.id
+                LEFT JOIN area_relations ar ON ar.entity_type = 'item' AND ar.entity_id = ir.id
+                LEFT JOIN areas a ON ar.area_id = a.id
+                LEFT JOIN process_items pi ON pi.item_id = ir.id
+                LEFT JOIN processes proc ON pi.process_id = proc.id
+                GROUP BY ir.id
+                ORDER BY ir.use_count DESC, ir.updated_at DESC
+                LIMIT ? OFFSET ?
+                """
+                cursor.execute(query_sql, (search_pattern, search_pattern, search_pattern, limit, offset))
+
+            # Convertir a dict
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                item_dict = dict(zip(columns, row))
+                results.append(item_dict)
+
+            logger.debug(f"Universal search found {len(results)} items for query '{query}'")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error en universal_search_items: {e}", exc_info=True)
+            return []
+
+    def universal_search_items_count(self, query: str) -> int:
+        """
+        Obtiene el conteo total de items que coinciden con la búsqueda
+
+        Args:
+            query: Texto de búsqueda
+
+        Returns:
+            int: Número total de items encontrados
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            # Verificar si existe FTS5 (con caché)
+            has_fts = self._check_fts5_available()
+
+            if has_fts and query.strip():
+                # Usar FTS5 para búsqueda rápida
+                search_query = f'"{query}"*'
+
+                query_sql = """
+                SELECT COUNT(DISTINCT i.id)
+                FROM items i
+                WHERE i.id IN (
+                    SELECT item_id FROM items_fts
+                    WHERE items_fts MATCH ?
+                )
+                AND i.is_active = 1
+                """
+                cursor.execute(query_sql, (search_query,))
+            else:
+                # Fallback a LIKE
+                search_pattern = f"%{query}%" if query.strip() else "%"
+
+                query_sql = """
+                SELECT COUNT(DISTINCT i.id)
+                FROM items i
+                WHERE (i.label LIKE ? OR i.content LIKE ? OR i.description LIKE ?)
+                AND i.is_active = 1
+                """
+                cursor.execute(query_sql, (search_pattern, search_pattern, search_pattern))
+
+            result = cursor.fetchone()
+            count = result[0] if result else 0
+            logger.debug(f"Universal search count: {count} items for query '{query}'")
+            return count
+
+        except Exception as e:
+            logger.error(f"Error en universal_search_items_count: {e}", exc_info=True)
+            return 0
+
+    def universal_search_tags(self, query: str, limit: int = 1000) -> List[Dict]:
+        """
+        Búsqueda de tags en todas las tablas de tags
+
+        Args:
+            query: Texto de búsqueda
+            limit: Límite de resultados
+
+        Returns:
+            List[Dict]: Tags encontrados con tipo y conteo
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            search_pattern = f"%{query}%"
+
+            # Buscar en todas las tablas de tags
+            query_sql = """
+            SELECT
+                'item_tag' as tag_type,
+                t.id,
+                t.name,
+                t.color,
+                t.usage_count,
+                t.created_at,
+                t.updated_at,
+                t.description,
+                COUNT(DISTINCT it.item_id) as item_count
+            FROM tags t
+            LEFT JOIN item_tags it ON t.id = it.tag_id
+            WHERE t.name LIKE ?
+            GROUP BY t.id
+
+            UNION ALL
+
+            SELECT
+                'category_tag' as tag_type,
+                ct.id,
+                ct.name,
+                NULL as color,
+                0 as usage_count,
+                ct.created_at,
+                ct.updated_at,
+                NULL as description,
+                COUNT(DISTINCT ctc.category_id) as item_count
+            FROM category_tags ct
+            LEFT JOIN category_tags_category ctc ON ct.id = ctc.tag_id
+            WHERE ct.name LIKE ?
+            GROUP BY ct.id
+
+            UNION ALL
+
+            SELECT
+                'project_tag' as tag_type,
+                pet.id,
+                pet.name,
+                pet.color,
+                0 as usage_count,
+                pet.created_at,
+                pet.updated_at,
+                pet.description,
+                COUNT(DISTINCT peta.project_relation_id) as item_count
+            FROM project_element_tags pet
+            LEFT JOIN project_element_tag_associations peta ON pet.id = peta.tag_id
+            WHERE pet.name LIKE ?
+            GROUP BY pet.id
+
+            UNION ALL
+
+            SELECT
+                'area_tag' as tag_type,
+                aet.id,
+                aet.name,
+                aet.color,
+                0 as usage_count,
+                aet.created_at,
+                aet.updated_at,
+                aet.description,
+                COUNT(DISTINCT aeta.area_relation_id) as item_count
+            FROM area_element_tags aet
+            LEFT JOIN area_element_tag_associations aeta ON aet.id = aeta.tag_id
+            WHERE aet.name LIKE ?
+            GROUP BY aet.id
+
+            ORDER BY item_count DESC, name ASC
+            LIMIT ?
+            """
+
+            cursor.execute(query_sql, (
+                search_pattern,
+                search_pattern,
+                search_pattern,
+                search_pattern,
+                limit
+            ))
+
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                tag_dict = dict(zip(columns, row))
+                results.append(tag_dict)
+
+            logger.debug(f"Universal tag search found {len(results)} tags for query '{query}'")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error en universal_search_tags: {e}", exc_info=True)
+            return []
+
+    def get_item_relationships(self, item_id: int) -> Optional[Dict]:
+        """
+        Obtiene todas las relaciones de un item específico
+
+        Args:
+            item_id: ID del item
+
+        Returns:
+            Dict con todas las relaciones o None si no existe
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            query = """
+            SELECT
+                i.id as item_id,
+                i.label,
+                -- Categoría
+                c.name as categoria,
+                -- Lista
+                l.name as lista,
+                -- Tabla
+                t.name as tabla,
+                -- Proyectos (puede estar en múltiples)
+                GROUP_CONCAT(DISTINCT p.name) as proyectos,
+                -- Áreas (puede estar en múltiples)
+                GROUP_CONCAT(DISTINCT a.name) as areas,
+                -- Procesos (puede estar en múltiples)
+                GROUP_CONCAT(DISTINCT proc.name) as procesos
+            FROM items i
+            LEFT JOIN categories c ON i.category_id = c.id
+            LEFT JOIN listas l ON i.list_id = l.id
+            LEFT JOIN tables t ON i.table_id = t.id
+            LEFT JOIN project_relations pr ON pr.entity_type = 'item' AND pr.entity_id = i.id
+            LEFT JOIN proyectos p ON pr.project_id = p.id
+            LEFT JOIN area_relations ar ON ar.entity_type = 'item' AND ar.entity_id = i.id
+            LEFT JOIN areas a ON ar.area_id = a.id
+            LEFT JOIN process_items pi ON pi.item_id = i.id
+            LEFT JOIN processes proc ON pi.process_id = proc.id
+            WHERE i.id = ?
+            GROUP BY i.id
+            """
+
+            cursor.execute(query, (item_id,))
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            columns = [desc[0] for desc in cursor.description]
+            return dict(zip(columns, row))
+
+        except Exception as e:
+            logger.error(f"Error en get_item_relationships: {e}", exc_info=True)
+            return None
+
+    def get_most_used_items(self, limit: int = 100) -> List[Dict]:
+        """
+        Obtiene los items más usados con todas sus relaciones
+
+        Args:
+            limit: Límite de resultados
+
+        Returns:
+            List[Dict]: Items ordenados por uso
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            query = """
+            WITH item_results AS (
+                SELECT
+                    i.id,
+                    i.label,
+                    i.content,
+                    i.icon,
+                    i.type,
+                    i.use_count,
+                    i.created_at,
+                    i.updated_at,
+                    i.last_used,
+                    i.tags,
+                    i.description,
+                    i.color,
+                    i.is_sensitive,
+                    i.is_favorite,
+                    c.name as categoria_name,
+                    c.id as categoria_id,
+                    l.name as lista_name,
+                    l.id as lista_id,
+                    t.name as tabla_name,
+                    t.id as tabla_id
+                FROM items i
+                LEFT JOIN categories c ON i.category_id = c.id
+                LEFT JOIN listas l ON i.list_id = l.id
+                LEFT JOIN tables t ON i.table_id = t.id
+                WHERE i.is_active = 1
+                ORDER BY i.use_count DESC, i.last_used DESC
+                LIMIT ?
+            )
+            SELECT
+                ir.*,
+                GROUP_CONCAT(DISTINCT p.name) as proyectos,
+                GROUP_CONCAT(DISTINCT a.name) as areas,
+                GROUP_CONCAT(DISTINCT proc.name) as procesos
+            FROM item_results ir
+            LEFT JOIN project_relations pr ON pr.entity_type = 'item' AND pr.entity_id = ir.id
+            LEFT JOIN proyectos p ON pr.project_id = p.id
+            LEFT JOIN area_relations ar ON ar.entity_type = 'item' AND ar.entity_id = ir.id
+            LEFT JOIN areas a ON ar.area_id = a.id
+            LEFT JOIN process_items pi ON pi.item_id = ir.id
+            LEFT JOIN processes proc ON pi.process_id = proc.id
+            GROUP BY ir.id
+            """
+
+            cursor.execute(query, (limit,))
+
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                item_dict = dict(zip(columns, row))
+                results.append(item_dict)
+
+            logger.debug(f"Found {len(results)} most used items")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error en get_most_used_items: {e}", exc_info=True)
+            return []
+
+    def get_items_with_tags(self, limit: int = 1000) -> List[Dict]:
+        """
+        Obtiene items que tienen al menos un tag
+
+        Args:
+            limit: Límite de resultados
+
+        Returns:
+            List[Dict]: Items con tags
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            query = """
+            WITH item_results AS (
+                SELECT DISTINCT
+                    i.id,
+                    i.label,
+                    i.content,
+                    i.icon,
+                    i.type,
+                    i.use_count,
+                    i.created_at,
+                    i.updated_at,
+                    i.last_used,
+                    i.tags,
+                    i.description,
+                    i.color,
+                    i.is_sensitive,
+                    i.is_favorite,
+                    c.name as categoria_name,
+                    c.id as categoria_id,
+                    l.name as lista_name,
+                    l.id as lista_id,
+                    t.name as tabla_name,
+                    t.id as tabla_id
+                FROM items i
+                LEFT JOIN categories c ON i.category_id = c.id
+                LEFT JOIN listas l ON i.list_id = l.id
+                LEFT JOIN tables t ON i.table_id = t.id
+                INNER JOIN item_tags it ON i.id = it.item_id
+                WHERE i.is_active = 1
+                LIMIT ?
+            )
+            SELECT
+                ir.*,
+                GROUP_CONCAT(DISTINCT p.name) as proyectos,
+                GROUP_CONCAT(DISTINCT a.name) as areas,
+                GROUP_CONCAT(DISTINCT proc.name) as procesos
+            FROM item_results ir
+            LEFT JOIN project_relations pr ON pr.entity_type = 'item' AND pr.entity_id = ir.id
+            LEFT JOIN proyectos p ON pr.project_id = p.id
+            LEFT JOIN area_relations ar ON ar.entity_type = 'item' AND ar.entity_id = ir.id
+            LEFT JOIN areas a ON ar.area_id = a.id
+            LEFT JOIN process_items pi ON pi.item_id = ir.id
+            LEFT JOIN processes proc ON pi.process_id = proc.id
+            GROUP BY ir.id
+            ORDER BY ir.updated_at DESC
+            """
+
+            cursor.execute(query, (limit,))
+
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                item_dict = dict(zip(columns, row))
+                results.append(item_dict)
+
+            logger.debug(f"Found {len(results)} items with tags")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error en get_items_with_tags: {e}", exc_info=True)
+            return []
+
+    def get_recent_items(self, limit: int = 100) -> List[Dict]:
+        """
+        Obtiene items recientes con todas sus relaciones
+
+        Args:
+            limit: Límite de resultados
+
+        Returns:
+            List[Dict]: Items ordenados por fecha
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+
+            query = """
+            WITH item_results AS (
+                SELECT
+                    i.id,
+                    i.label,
+                    i.content,
+                    i.icon,
+                    i.type,
+                    i.use_count,
+                    i.created_at,
+                    i.updated_at,
+                    i.last_used,
+                    i.tags,
+                    i.description,
+                    i.color,
+                    i.is_sensitive,
+                    i.is_favorite,
+                    c.name as categoria_name,
+                    c.id as categoria_id,
+                    l.name as lista_name,
+                    l.id as lista_id,
+                    t.name as tabla_name,
+                    t.id as tabla_id
+                FROM items i
+                LEFT JOIN categories c ON i.category_id = c.id
+                LEFT JOIN listas l ON i.list_id = l.id
+                LEFT JOIN tables t ON i.table_id = t.id
+                WHERE i.is_active = 1
+                ORDER BY
+                    CASE
+                        WHEN i.last_used IS NOT NULL THEN i.last_used
+                        ELSE i.updated_at
+                    END DESC
+                LIMIT ?
+            )
+            SELECT
+                ir.*,
+                GROUP_CONCAT(DISTINCT p.name) as proyectos,
+                GROUP_CONCAT(DISTINCT a.name) as areas,
+                GROUP_CONCAT(DISTINCT proc.name) as procesos
+            FROM item_results ir
+            LEFT JOIN project_relations pr ON pr.entity_type = 'item' AND pr.entity_id = ir.id
+            LEFT JOIN proyectos p ON pr.project_id = p.id
+            LEFT JOIN area_relations ar ON ar.entity_type = 'item' AND ar.entity_id = ir.id
+            LEFT JOIN areas a ON ar.area_id = a.id
+            LEFT JOIN process_items pi ON pi.item_id = ir.id
+            LEFT JOIN processes proc ON pi.process_id = proc.id
+            GROUP BY ir.id
+            """
+
+            cursor.execute(query, (limit,))
+
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                item_dict = dict(zip(columns, row))
+                results.append(item_dict)
+
+            logger.debug(f"Found {len(results)} recent items")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error en get_recent_items: {e}", exc_info=True)
+            return []
 
     # ==================== Context Manager ====================
 

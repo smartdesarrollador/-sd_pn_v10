@@ -54,6 +54,9 @@ class Sidebar(QWidget):
     # Signal emitted when advanced search button is clicked
     advanced_search_clicked = pyqtSignal()
 
+    # Signal emitted when universal search button is clicked
+    universal_search_clicked = pyqtSignal()
+
     # Signal emitted when image gallery button is clicked
     image_gallery_clicked = pyqtSignal()
 
@@ -853,6 +856,7 @@ class Sidebar(QWidget):
             # Connect signals if controller is available
             if self.controller:
                 self.quick_access_panel.advanced_search_clicked.connect(lambda: self.advanced_search_clicked.emit())
+                self.quick_access_panel.universal_search_clicked.connect(lambda: self.universal_search_clicked.emit())
                 self.quick_access_panel.stats_clicked.connect(lambda: self.stats_clicked.emit())
                 self.quick_access_panel.tables_manager_clicked.connect(lambda: self.tables_manager_clicked.emit())
                 self.quick_access_panel.favorites_clicked.connect(lambda: self.favorites_clicked.emit())

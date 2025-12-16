@@ -36,6 +36,7 @@ class QuickAccessPanel(QWidget):
     ai_table_clicked = pyqtSignal()
     pinned_panels_clicked = pyqtSignal()
     advanced_search_clicked = pyqtSignal()
+    universal_search_clicked = pyqtSignal()  # NEW: Universal Search
     component_manager_clicked = pyqtSignal()
     web_static_create_clicked = pyqtSignal()
     image_gallery_clicked = pyqtSignal()  # NEW: Image Gallery
@@ -123,6 +124,7 @@ class QuickAccessPanel(QWidget):
         # Buttons config (icon, label, handler)
         buttons_config = [
             ("🔍⚡", "Búsqueda Avanzada", self.on_advanced_search_clicked),
+            ("🔍🌐", "Búsqueda Universal", self.on_universal_search_clicked),  # NEW: Universal Search
             ("📁", "Proyectos", self.on_projects_clicked),  # NEW: Projects Manager
             ("🏢", "Áreas", self.on_areas_clicked),  # NEW: Areas Manager
             ("🖼️", "Galería de Imágenes", self.on_image_gallery_clicked),
@@ -276,6 +278,11 @@ class QuickAccessPanel(QWidget):
     def on_advanced_search_clicked(self):
         """Handle advanced search button click"""
         self.advanced_search_clicked.emit()
+        self.hide()
+
+    def on_universal_search_clicked(self):
+        """Handle universal search button click"""
+        self.universal_search_clicked.emit()
         self.hide()
 
     def on_component_manager_clicked(self):

@@ -1,8 +1,10 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QLabel, QPushButton, QHBoxLayout
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtGui import QShortcut, QKeySequence
 from ..project_manager.styles.full_view_styles import FullViewStyles
 from ..project_manager.widgets.headers import ProjectHeaderWidget, ProjectTagHeaderWidget
 from ..project_manager.widgets.item_group_widget import ItemGroupWidget
+from ..project_manager.widgets.common import SearchBarWidget
 from .area_data_manager import AreaDataManager
 
 
@@ -20,6 +22,11 @@ class AreaFullViewPanel(QWidget):
         self.tag_headers = []  # Lista para trackear los headers de tags
         self.all_collapsed = False  # Estado del botón de colapsar todo
 
+        # Estado de búsqueda
+        self.search_results = []  # Lista de widgets de items que coinciden
+        self.current_result_index = -1  # Índice del resultado actual
+        self.search_bar = None  # Widget de búsqueda
+
         self.init_ui()
         self.apply_styles()
 
@@ -28,7 +35,7 @@ class AreaFullViewPanel(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header con botón de colapsar todo
+        # Header con botón de colapsar todo y búsqueda
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
         header_layout.setContentsMargins(15, 10, 15, 10)
@@ -60,9 +67,51 @@ class AreaFullViewPanel(QWidget):
             }
         """)
         header_layout.addWidget(self.toggle_all_btn)
+
+        # Botón para mostrar búsqueda
+        self.show_search_btn = QPushButton("🔍 Buscar")
+        self.show_search_btn.setFixedHeight(30)
+        self.show_search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.show_search_btn.clicked.connect(self.show_search)
+        self.show_search_btn.setToolTip("Buscar en vista completa (Ctrl+F)")
+        self.show_search_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2C2C2C;
+                color: #00BFFF;
+                border: 1px solid #00BFFF;
+                border-radius: 4px;
+                padding: 5px 15px;
+                font-size: 12px;
+                font-weight: 600;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QPushButton:hover {
+                background-color: #3C3C3C;
+                border-color: #1E90FF;
+                color: #1E90FF;
+            }
+            QPushButton:pressed {
+                background-color: #1C1C1C;
+            }
+        """)
+        header_layout.addWidget(self.show_search_btn)
+
         header_layout.addStretch()
 
         main_layout.addWidget(header_widget)
+
+        # Widget de búsqueda (inicialmente oculto)
+        self.search_bar = SearchBarWidget()
+        self.search_bar.setVisible(False)
+        self.search_bar.search_text_changed.connect(self._on_search_text_changed)
+        self.search_bar.next_result.connect(self._go_to_next_result)
+        self.search_bar.previous_result.connect(self._go_to_previous_result)
+        self.search_bar.search_closed.connect(self._on_search_closed)
+        main_layout.addWidget(self.search_bar)
+
+        # Atajo de teclado Ctrl+F
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.search_shortcut.activated.connect(self.show_search)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
@@ -276,7 +325,136 @@ class AreaFullViewPanel(QWidget):
         else:
             self.toggle_all_btn.setText("Colapsar Todo")
 
+    def show_search(self):
+        """
+        Mostrar widget de búsqueda y dar foco al campo de texto
+
+        Si la búsqueda ya está visible, da foco al campo.
+        """
+        self.search_bar.setVisible(True)
+        self.search_bar.focus_search_input()
+
+    def _on_search_text_changed(self, text: str):
+        """
+        Manejar cambio de texto de búsqueda
+
+        Busca todos los items que coincidan y resalta el texto.
+
+        Args:
+            text: Texto de búsqueda
+        """
+        # Limpiar búsqueda anterior
+        self._clear_search_highlights()
+        self.search_results.clear()
+        self.current_result_index = -1
+
+        if not text:
+            self.search_bar.update_results(0, 0)
+            return
+
+        # Buscar en todos los widgets de items
+        from ..project_manager.widgets.items.base_item_widget import BaseItemWidget
+
+        all_item_widgets = self.content_widget.findChildren(BaseItemWidget)
+
+        for item_widget in all_item_widgets:
+            if item_widget.has_match(text):
+                self.search_results.append(item_widget)
+                item_widget.highlight_text(text)
+
+        # Actualizar contador
+        total_results = len(self.search_results)
+        if total_results > 0:
+            self.current_result_index = 0
+            self.search_bar.update_results(0, total_results)
+            # Scroll al primer resultado
+            self._scroll_to_item(self.search_results[0])
+        else:
+            self.search_bar.update_results(0, 0)
+
+    def _go_to_next_result(self):
+        """
+        Ir al siguiente resultado de búsqueda
+
+        Navega al siguiente item que coincide y hace scroll para mostrarlo.
+        """
+        if not self.search_results:
+            return
+
+        # Incrementar índice (con wrap-around)
+        self.current_result_index = (self.current_result_index + 1) % len(self.search_results)
+
+        # Actualizar contador y scroll
+        self.search_bar.update_results(self.current_result_index, len(self.search_results))
+        self._scroll_to_item(self.search_results[self.current_result_index])
+
+    def _go_to_previous_result(self):
+        """
+        Ir al resultado anterior de búsqueda
+
+        Navega al resultado anterior y hace scroll para mostrarlo.
+        """
+        if not self.search_results:
+            return
+
+        # Decrementar índice (con wrap-around)
+        self.current_result_index = (self.current_result_index - 1) % len(self.search_results)
+
+        # Actualizar contador y scroll
+        self.search_bar.update_results(self.current_result_index, len(self.search_results))
+        self._scroll_to_item(self.search_results[self.current_result_index])
+
+    def _on_search_closed(self):
+        """
+        Cerrar búsqueda y limpiar resaltados
+
+        Oculta el widget de búsqueda y limpia todos los resaltados.
+        """
+        self.search_bar.setVisible(False)
+        self._clear_search_highlights()
+        self.search_results.clear()
+        self.current_result_index = -1
+
+    def _clear_search_highlights(self):
+        """
+        Limpiar todos los resaltados de búsqueda
+
+        Recorre todos los widgets de items y limpia sus resaltados.
+        """
+        from ..project_manager.widgets.items.base_item_widget import BaseItemWidget
+
+        all_item_widgets = self.content_widget.findChildren(BaseItemWidget)
+        for item_widget in all_item_widgets:
+            item_widget.clear_highlight()
+
+    def _scroll_to_item(self, item_widget):
+        """
+        Hacer scroll para mostrar un item específico
+
+        Args:
+            item_widget: Widget del item a mostrar
+        """
+        if not item_widget:
+            return
+
+        # Obtener la posición del widget en el scroll area
+        item_pos = item_widget.mapTo(self.content_widget, item_widget.rect().topLeft())
+
+        # Hacer scroll para mostrar el item (centrado si es posible)
+        viewport_height = self.scroll_area.viewport().height()
+        item_height = item_widget.height()
+
+        # Calcular posición de scroll centrada
+        scroll_value = item_pos.y() - (viewport_height // 2) + (item_height // 2)
+
+        # Animar scroll suavemente
+        self.scroll_area.verticalScrollBar().setValue(scroll_value)
+
     def clear_view(self):
+        # Limpiar búsqueda
+        if self.search_bar and self.search_bar.isVisible():
+            self._on_search_closed()
+
         # Limpiar lista de headers
         self.tag_headers.clear()
 

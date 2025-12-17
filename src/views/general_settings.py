@@ -6,7 +6,7 @@ Widget for general application settings
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox,
     QSpinBox, QPushButton, QGroupBox, QFormLayout, QFileDialog,
-    QMessageBox
+    QMessageBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from views.dialogs.password_verify_dialog import PasswordVerifyDialog
+from core.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,55 @@ class GeneralSettings(QWidget):
 
         clipboard_group.setLayout(clipboard_layout)
         main_layout.addWidget(clipboard_group)
+
+        # Security group
+        security_group = QGroupBox("Seguridad")
+        security_layout = QFormLayout()
+        security_layout.setSpacing(10)
+
+        # Current password
+        self.current_password_input = QLineEdit()
+        self.current_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.current_password_input.setPlaceholderText("Ingresa tu contraseña actual")
+        security_layout.addRow("Contraseña actual:", self.current_password_input)
+
+        # New password
+        self.new_password_input = QLineEdit()
+        self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.new_password_input.setPlaceholderText("Ingresa tu nueva contraseña")
+        security_layout.addRow("Nueva contraseña:", self.new_password_input)
+
+        # Confirm password
+        self.confirm_password_input = QLineEdit()
+        self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.confirm_password_input.setPlaceholderText("Confirma tu nueva contraseña")
+        security_layout.addRow("Confirmar contraseña:", self.confirm_password_input)
+
+        # Change password button
+        change_password_btn_layout = QHBoxLayout()
+        change_password_btn_layout.addStretch()
+        self.change_password_btn = QPushButton("Cambiar Contraseña")
+        self.change_password_btn.clicked.connect(self.change_password)
+        self.change_password_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007acc;
+                color: #ffffff;
+                border: none;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #005a9e;
+            }
+            QPushButton:pressed {
+                background-color: #004578;
+            }
+        """)
+        change_password_btn_layout.addWidget(self.change_password_btn)
+        security_layout.addRow("", change_password_btn_layout)
+
+        security_group.setLayout(security_layout)
+        main_layout.addWidget(security_group)
 
         # Import/Export group
         io_group = QGroupBox("Importar/Exportar")
@@ -196,6 +246,17 @@ class GeneralSettings(QWidget):
                 min-width: 100px;
             }
             QSpinBox:focus {
+                border: 1px solid #007acc;
+            }
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 8px;
+                min-width: 200px;
+            }
+            QLineEdit:focus {
                 border: 1px solid #007acc;
             }
             QPushButton {
@@ -331,6 +392,101 @@ class GeneralSettings(QWidget):
                 "Error",
                 f"Error al importar configuración:\n{str(e)}"
             )
+
+    def change_password(self):
+        """Change user password"""
+        # Get values
+        current_password = self.current_password_input.text()
+        new_password = self.new_password_input.text()
+        confirm_password = self.confirm_password_input.text()
+
+        # Validate inputs
+        if not current_password:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Por favor ingresa tu contraseña actual"
+            )
+            self.current_password_input.setFocus()
+            return
+
+        if not new_password:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Por favor ingresa una nueva contraseña"
+            )
+            self.new_password_input.setFocus()
+            return
+
+        if len(new_password) < 4:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "La nueva contraseña debe tener al menos 4 caracteres"
+            )
+            self.new_password_input.setFocus()
+            return
+
+        if not confirm_password:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Por favor confirma tu nueva contraseña"
+            )
+            self.confirm_password_input.setFocus()
+            return
+
+        # Validate passwords match
+        if new_password != confirm_password:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Las contraseñas no coinciden"
+            )
+            self.confirm_password_input.clear()
+            self.confirm_password_input.setFocus()
+            return
+
+        # Validate current password is different from new
+        if current_password == new_password:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "La nueva contraseña debe ser diferente a la actual"
+            )
+            self.new_password_input.clear()
+            self.confirm_password_input.clear()
+            self.new_password_input.setFocus()
+            return
+
+        # Change password using AuthManager
+        auth_manager = AuthManager()
+        success = auth_manager.change_password(current_password, new_password)
+
+        if success:
+            # Success
+            QMessageBox.information(
+                self,
+                "Contraseña Cambiada",
+                "Tu contraseña ha sido cambiada exitosamente"
+            )
+            logger.info("Password changed successfully")
+
+            # Clear fields
+            self.current_password_input.clear()
+            self.new_password_input.clear()
+            self.confirm_password_input.clear()
+        else:
+            # Failed - incorrect current password
+            QMessageBox.warning(
+                self,
+                "Error",
+                "La contraseña actual es incorrecta"
+            )
+            self.current_password_input.clear()
+            self.current_password_input.setFocus()
+            logger.warning("Failed to change password: incorrect current password")
 
     def get_settings(self) -> dict:
         """

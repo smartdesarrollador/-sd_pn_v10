@@ -923,6 +923,20 @@ class ItemButton(QFrame):
 
     def toggle_reveal(self):
         """Toggle reveal/hide sensitive content"""
+        # Si el item es sensible y NO está revelado, verificar contraseña maestra
+        if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive and not self.is_revealed:
+            from views.dialogs.master_password_dialog import MasterPasswordDialog
+
+            verified = MasterPasswordDialog.verify(
+                title="Item Sensible",
+                message=f"Ingresa tu contraseña maestra para revelar:\n'{self.item.label}'",
+                parent=self.window()
+            )
+
+            if not verified:
+                logger.info(f"Master password verification cancelled for revealing item: {self.item.label}")
+                return  # Usuario canceló o contraseña incorrecta
+
         self.is_revealed = not self.is_revealed
 
         # Update label with new display text
@@ -1073,6 +1087,20 @@ class ItemButton(QFrame):
     def show_details(self):
         """Mostrar ventana de detalles del item"""
         try:
+            # Si el item es sensible, verificar contraseña maestra
+            if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+                from views.dialogs.master_password_dialog import MasterPasswordDialog
+
+                verified = MasterPasswordDialog.verify(
+                    title="Item Sensible",
+                    message=f"Ingresa tu contraseña maestra para ver detalles de:\n'{self.item.label}'",
+                    parent=self.window()
+                )
+
+                if not verified:
+                    logger.info(f"Master password verification cancelled for viewing details of item: {self.item.label}")
+                    return  # Usuario canceló o contraseña incorrecta
+
             # Find the FloatingPanel or GlobalSearchPanel parent to pass to dialog
             refresh_panel = None
             parent_widget = self.parent()
@@ -1091,6 +1119,20 @@ class ItemButton(QFrame):
     def edit_item(self):
         """Emite señal para editar el item"""
         try:
+            # Si el item es sensible, verificar contraseña maestra
+            if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
+                from views.dialogs.master_password_dialog import MasterPasswordDialog
+
+                verified = MasterPasswordDialog.verify(
+                    title="Item Sensible",
+                    message=f"Ingresa tu contraseña maestra para editar:\n'{self.item.label}'",
+                    parent=self.window()
+                )
+
+                if not verified:
+                    logger.info(f"Master password verification cancelled for editing item: {self.item.label}")
+                    return  # Usuario canceló o contraseña incorrecta
+
             logger.info(f"Edit button clicked for item: {self.item.label}")
             self.item_edit_requested.emit(self.item)
         except Exception as e:

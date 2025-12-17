@@ -209,8 +209,8 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         self.sidebar.set_controller(self.controller)  # Set controller reference for notebook
         self.sidebar.category_clicked.connect(self.on_category_clicked)
-        # Usar búsqueda universal en lugar de global search
-        self.sidebar.global_search_clicked.connect(self.show_universal_search)
+        # Lupa de la barra lateral abre GlobalSearchPanel (panel flotante)
+        self.sidebar.global_search_clicked.connect(self.on_global_search_clicked)
         self.sidebar.screenshot_clicked.connect(self.on_screenshot_clicked)
         self.sidebar.advanced_search_clicked.connect(self.on_advanced_search_clicked)
         self.sidebar.universal_search_clicked.connect(self.show_universal_search)

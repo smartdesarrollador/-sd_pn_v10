@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.bulk_item_data import BulkItemData
+from src.models.bulk_item_data import BulkItemData
 
 logger = logging.getLogger(__name__)
 

@@ -14,9 +14,9 @@ from pathlib import Path
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from views.item_editor_dialog import ItemEditorDialog
-from views.widgets.category_tag_selector import CategoryTagSelector
-from core.category_tag_manager import CategoryTagManager
+from src.views.item_editor_dialog import ItemEditorDialog
+from src.views.widgets.category_tag_selector import CategoryTagSelector
+from src.core.category_tag_manager import CategoryTagManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class QuickCreateDialog(QDialog):
         super().__init__(parent)
 
         # Soportar tanto controller como db_manager directo
-        from database.db_manager import DBManager
+        from src.database.db_manager import DBManager
 
         if isinstance(controller, DBManager):
             # Se pasó un DBManager directo - crear mock controller

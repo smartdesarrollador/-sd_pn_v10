@@ -1573,7 +1573,7 @@ Busca la frase exacta.<br>
         """Edita un item"""
         # Si el item es sensible, verificar contraseña maestra
         if hasattr(result, 'is_sensitive') and result.is_sensitive:
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             verified = MasterPasswordDialog.verify(
                 title="Item Sensible",
@@ -1666,7 +1666,7 @@ Busca la frase exacta.<br>
             )
 
             if has_sensitive_items:
-                from views.dialogs.master_password_dialog import MasterPasswordDialog
+                from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
                 verified = MasterPasswordDialog.verify(
                     title="Exportar Items Sensibles",
@@ -1748,7 +1748,7 @@ Busca la frase exacta.<br>
             )
 
             if has_sensitive_items:
-                from views.dialogs.master_password_dialog import MasterPasswordDialog
+                from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
                 verified = MasterPasswordDialog.verify(
                     title="Exportar Items Sensibles",

@@ -17,7 +17,7 @@ except ImportError:
     JSONSCHEMA_AVAILABLE = False
     logging.warning("jsonschema no está instalado. Validación limitada disponible.")
 
-from models.bulk_item_data import ValidationResult, BulkItemData, BulkItemDefaults
+from src.models.bulk_item_data import ValidationResult, BulkItemData, BulkItemDefaults
 
 logger = logging.getLogger(__name__)
 

@@ -21,8 +21,8 @@ from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from models.ai_table_data import AITablePromptConfig
-from utils.ai_table_prompt_templates import AITablePromptTemplate
+from src.models.ai_table_data import AITablePromptConfig
+from src.utils.ai_table_prompt_templates import AITablePromptTemplate
 
 logger = logging.getLogger(__name__)
 

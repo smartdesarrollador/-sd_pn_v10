@@ -13,7 +13,7 @@ from pathlib import Path
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.tag_groups_manager import TagGroupsManager
+from src.core.tag_groups_manager import TagGroupsManager
 
 logger = logging.getLogger(__name__)
 
@@ -382,7 +382,7 @@ class TagGroupSelector(QWidget):
     def open_tag_groups_manager(self):
         """Abrir el diálogo de gestión de Tag Groups"""
         try:
-            from views.dialogs.tag_groups_dialog import TagGroupsDialog
+            from src.views.dialogs.tag_groups_dialog import TagGroupsDialog
 
             dialog = TagGroupsDialog(self)
             if dialog.exec():

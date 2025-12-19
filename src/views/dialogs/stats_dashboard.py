@@ -20,8 +20,8 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.stats_manager import StatsManager
-from core.favorites_manager import FavoritesManager
+from src.core.stats_manager import StatsManager
+from src.core.favorites_manager import FavoritesManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -718,7 +718,7 @@ class StatsDashboard(QDialog):
 
     def show_cleanup_dialog(self):
         """Mostrar diálogo de limpieza"""
-        from views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
+        from src.views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
         dialog = ForgottenItemsDialog(self)
         if dialog.exec():
             # Recargar datos

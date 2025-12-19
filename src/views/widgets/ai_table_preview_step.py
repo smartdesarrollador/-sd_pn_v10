@@ -21,7 +21,7 @@ from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from models.ai_table_data import AITableData
+from src.models.ai_table_data import AITableData
 
 logger = logging.getLogger(__name__)
 

@@ -13,10 +13,10 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.category import Category
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
-from views.widgets.category_list_item import CategoryListItem
-from views.dialogs.category_form_dialog import CategoryFormDialog
+from src.models.category import Category
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.views.widgets.category_list_item import CategoryListItem
+from src.views.dialogs.category_form_dialog import CategoryFormDialog
 
 # Get logger
 logger = logging.getLogger(__name__)

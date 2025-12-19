@@ -12,13 +12,13 @@ import platform
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.item import Item, ItemType
-from core.usage_tracker import UsageTracker
-from core.favorites_manager import FavoritesManager
-from core.file_manager import FileManager
-from core.config_manager import ConfigManager
-from views.command_output_dialog import CommandOutputDialog
-from views.dialogs.item_details_dialog import ItemDetailsDialog
+from src.models.item import Item, ItemType
+from src.core.usage_tracker import UsageTracker
+from src.core.favorites_manager import FavoritesManager
+from src.core.file_manager import FileManager
+from src.core.config_manager import ConfigManager
+from src.views.command_output_dialog import CommandOutputDialog
+from src.views.dialogs.item_details_dialog import ItemDetailsDialog
 from styles.panel_styles import PanelStyles
 import time
 import logging
@@ -925,7 +925,7 @@ class ItemButton(QFrame):
         """Toggle reveal/hide sensitive content"""
         # Si el item es sensible y NO está revelado, verificar contraseña maestra
         if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive and not self.is_revealed:
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             verified = MasterPasswordDialog.verify(
                 title="Item Sensible",
@@ -1089,7 +1089,7 @@ class ItemButton(QFrame):
         try:
             # Si el item es sensible, verificar contraseña maestra
             if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
-                from views.dialogs.master_password_dialog import MasterPasswordDialog
+                from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
                 verified = MasterPasswordDialog.verify(
                     title="Item Sensible",
@@ -1121,7 +1121,7 @@ class ItemButton(QFrame):
         try:
             # Si el item es sensible, verificar contraseña maestra
             if hasattr(self.item, 'is_sensitive') and self.item.is_sensitive:
-                from views.dialogs.master_password_dialog import MasterPasswordDialog
+                from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
                 verified = MasterPasswordDialog.verify(
                     title="Item Sensible",

@@ -243,7 +243,7 @@ class MasterPasswordDialog(QDialog):
             bool: True if password was verified OR no master password configured, False if cancelled
 
         Example:
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             # Check before copying sensitive item
             if MasterPasswordDialog.verify(

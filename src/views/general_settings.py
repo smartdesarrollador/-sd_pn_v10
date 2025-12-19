@@ -16,9 +16,9 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.dialogs.password_verify_dialog import PasswordVerifyDialog
-from core.auth_manager import AuthManager
-from core.master_password_manager import MasterPasswordManager
+from src.views.dialogs.password_verify_dialog import PasswordVerifyDialog
+from src.core.auth_manager import AuthManager
+from src.core.master_password_manager import MasterPasswordManager
 
 logger = logging.getLogger(__name__)
 
@@ -426,7 +426,7 @@ class GeneralSettings(QWidget):
             master_mgr = MasterPasswordManager()
             if master_mgr.has_master_password():
                 # Master password exists - verify it
-                from views.dialogs.master_password_dialog import MasterPasswordDialog
+                from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
                 master_verified = MasterPasswordDialog.verify(
                     title="Exportar Configuración",

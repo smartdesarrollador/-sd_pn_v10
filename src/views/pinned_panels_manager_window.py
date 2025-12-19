@@ -534,7 +534,7 @@ class PinnedPanelsManagerWindow(QWidget):
                 return
 
             # Abrir diálogo de personalización
-            from views.dialogs.panel_customization_dialog import PanelCustomizationDialog
+            from src.views.dialogs.panel_customization_dialog import PanelCustomizationDialog
 
             dialog = PanelCustomizationDialog(
                 panel=panel,

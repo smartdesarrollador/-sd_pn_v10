@@ -9,11 +9,11 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.category import Category
-from models.item import Item
-from views.widgets.item_widget import ItemButton
-from views.widgets.search_bar import SearchBar
-from core.search_engine import SearchEngine
+from src.models.category import Category
+from src.models.item import Item
+from src.views.widgets.item_widget import ItemButton
+from src.views.widgets.search_bar import SearchBar
+from src.core.search_engine import SearchEngine
 
 # Get logger
 logger = logging.getLogger(__name__)

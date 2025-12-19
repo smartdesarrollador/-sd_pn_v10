@@ -19,10 +19,10 @@ from PyQt6.QtGui import QFont
 # Agregar path al sys.path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database.db_manager import DBManager
-from views.widgets.table_config_step import TableConfigStep
-from views.widgets.table_editor_step import TableEditorStep
-from controllers.table_controller import TableController
+from src.database.db_manager import DBManager
+from src.views.widgets.table_config_step import TableConfigStep
+from src.views.widgets.table_editor_step import TableEditorStep
+from src.controllers.table_controller import TableController
 
 logger = logging.getLogger(__name__)
 

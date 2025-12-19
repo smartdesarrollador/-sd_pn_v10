@@ -22,13 +22,13 @@ from PyQt6.QtGui import QFont
 # Agregar path al sys.path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database.db_manager import DBManager
-from core.ai_table_manager import AITableManager
-from views.widgets.ai_table_config_step import AITableConfigStep
-from views.widgets.ai_table_prompt_step import AITablePromptStep
-from views.widgets.ai_table_json_step import AITableJSONStep
-from views.widgets.ai_table_preview_step import AITablePreviewStep
-from views.widgets.ai_table_creation_step import AITableCreationStep
+from src.database.db_manager import DBManager
+from src.core.ai_table_manager import AITableManager
+from src.views.widgets.ai_table_config_step import AITableConfigStep
+from src.views.widgets.ai_table_prompt_step import AITablePromptStep
+from src.views.widgets.ai_table_json_step import AITableJSONStep
+from src.views.widgets.ai_table_preview_step import AITablePreviewStep
+from src.views.widgets.ai_table_creation_step import AITableCreationStep
 
 logger = logging.getLogger(__name__)
 

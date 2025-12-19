@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from database.db_manager import DBManager
-from core.table_validator import TableValidator
+from src.database.db_manager import DBManager
+from src.core.table_validator import TableValidator
 
 logger = logging.getLogger(__name__)
 

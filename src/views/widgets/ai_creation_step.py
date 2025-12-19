@@ -7,8 +7,8 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.ai_bulk_manager import AIBulkItemManager
-from models.bulk_item_data import BulkItemData
+from src.core.ai_bulk_manager import AIBulkItemManager
+from src.models.bulk_item_data import BulkItemData
 
 logger = logging.getLogger(__name__)
 

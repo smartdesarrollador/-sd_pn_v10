@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.ai_table_data import TableValidationResult
+from src.models.ai_table_data import TableValidationResult
 
 logger = logging.getLogger(__name__)
 

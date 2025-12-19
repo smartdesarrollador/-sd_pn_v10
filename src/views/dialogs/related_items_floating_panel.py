@@ -12,11 +12,11 @@ from pathlib import Path
 from enum import Enum
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.item import Item
-from views.widgets.related_item_card import RelatedItemCard
+from src.models.item import Item
+from src.views.widgets.related_item_card import RelatedItemCard
 from styles.futuristic_theme import get_theme
 from styles.panel_styles import PanelStyles
-from utils.panel_resizer import PanelResizer
+from src.utils.panel_resizer import PanelResizer
 
 # Get logger
 logger = logging.getLogger(__name__)

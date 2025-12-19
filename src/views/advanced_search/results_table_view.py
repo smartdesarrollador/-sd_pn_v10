@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.item import Item, ItemType
+from src.models.item import Item, ItemType
 
 import logging
 logger = logging.getLogger(__name__)

@@ -15,9 +15,9 @@ import uuid
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.category import Category
-from models.item import Item, ItemType
-from views.item_editor_dialog import ItemEditorDialog
+from src.models.category import Category
+from src.models.item import Item, ItemType
+from src.views.item_editor_dialog import ItemEditorDialog
 
 logger = logging.getLogger(__name__)
 
@@ -640,7 +640,7 @@ class CategoryEditor(QWidget):
         logger.info(f"[BULK_CREATE] Opening bulk dialog for category: {category.name}")
 
         # Importar el diálogo
-        from views.dialogs.bulk_item_dialog import BulkItemDialog
+        from src.views.dialogs.bulk_item_dialog import BulkItemDialog
 
         # Abrir diálogo de creación masiva
         db_path = str(self.controller.config_manager.db.db_path) if self.controller and hasattr(self.controller, 'config_manager') and hasattr(self.controller.config_manager, 'db') else None
@@ -710,7 +710,7 @@ class CategoryEditor(QWidget):
 
         # Si el item es sensible, verificar contraseña maestra
         if hasattr(item, 'is_sensitive') and item.is_sensitive:
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             verified = MasterPasswordDialog.verify(
                 title="Item Sensible",

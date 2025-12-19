@@ -9,10 +9,10 @@ from typing import Dict, List, Any, Optional
 
 # Add models to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.category import Category
-from models.item import Item, ItemType
-from database.db_manager import DBManager
-from core.encryption_manager import EncryptionManager
+from src.models.category import Category
+from src.models.item import Item, ItemType
+from src.database.db_manager import DBManager
+from src.core.encryption_manager import EncryptionManager
 
 
 class ConfigManager:

@@ -67,13 +67,13 @@ if not getattr(sys, 'frozen', False):
     src_path = Path(__file__).parent / 'src'
     sys.path.insert(0, str(src_path))
 
-from controllers.main_controller import MainController
-from views.main_window import MainWindow
-from core.auth_manager import AuthManager
-from core.session_manager import SessionManager
-from core.left_sidebar_manager import get_left_sidebar
-from views.first_time_wizard import FirstTimeWizard
-from views.login_dialog import LoginDialog
+from src.controllers.main_controller import MainController
+from src.views.main_window import MainWindow
+from src.core.auth_manager import AuthManager
+from src.core.session_manager import SessionManager
+from src.core.left_sidebar_manager import get_left_sidebar
+from src.views.first_time_wizard import FirstTimeWizard
+from src.views.login_dialog import LoginDialog
 
 
 def get_app_dir() -> Path:
@@ -100,7 +100,7 @@ def ensure_database(db_path: Path) -> None:
     if not db_path.exists():
         print(f"Database not found, creating new database at {db_path}...")
         # Import here to avoid circular imports
-        from database.db_manager import DBManager
+        from src.database.db_manager import DBManager
 
         # Create database (will auto-initialize with schema)
         db = DBManager(str(db_path))

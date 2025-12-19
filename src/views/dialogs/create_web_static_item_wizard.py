@@ -17,10 +17,10 @@ from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.html_validator import validate_web_static_content
-from utils.constants import ITEM_TYPE_ICONS
-from views.widgets.project_tag_selector import ProjectTagSelector
-from core.global_tag_manager import GlobalTagManager
+from src.utils.html_validator import validate_web_static_content
+from src.utils.constants import ITEM_TYPE_ICONS
+from src.views.widgets.project_tag_selector import ProjectTagSelector
+from src.core.global_tag_manager import GlobalTagManager
 
 logger = logging.getLogger(__name__)
 

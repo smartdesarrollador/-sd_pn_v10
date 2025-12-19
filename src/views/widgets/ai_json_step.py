@@ -7,9 +7,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.ai_bulk_manager import AIBulkItemManager
-from models.bulk_item_data import ValidationResult
-from views.widgets.json_editor import JSONEditor
+from src.core.ai_bulk_manager import AIBulkItemManager
+from src.models.bulk_item_data import ValidationResult
+from src.views.widgets.json_editor import JSONEditor
 
 logger = logging.getLogger(__name__)
 

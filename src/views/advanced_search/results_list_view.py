@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from views.widgets.item_widget import ItemButton
-from models.item import Item
+from src.views.widgets.item_widget import ItemButton
+from src.models.item import Item
 
 import logging
 logger = logging.getLogger(__name__)

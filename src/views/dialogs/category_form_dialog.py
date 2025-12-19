@@ -14,8 +14,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from views.widgets.category_tag_selector import CategoryTagSelector
-from core.category_tag_manager import CategoryTagManager
+from src.views.widgets.category_tag_selector import CategoryTagSelector
+from src.core.category_tag_manager import CategoryTagManager
 
 # Get logger
 logger = logging.getLogger(__name__)

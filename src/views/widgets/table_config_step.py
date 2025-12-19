@@ -24,10 +24,10 @@ from PyQt6.QtGui import QFont
 # Agregar path al sys.path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database.db_manager import DBManager
-from core.table_validator import TableValidator
-from views.widgets.project_tag_selector import ProjectTagSelector
-from core.global_tag_manager import GlobalTagManager
+from src.database.db_manager import DBManager
+from src.core.table_validator import TableValidator
+from src.views.widgets.project_tag_selector import ProjectTagSelector
+from src.core.global_tag_manager import GlobalTagManager
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +361,7 @@ class TableConfigStep(QWidget):
             else:
                 cats = self.db.get_categories()
                 # Convertir dicts a objetos con atributos
-                from models.category import Category
+                from src.models.category import Category
                 self.categories = []
                 for cat_dict in cats:
                     cat = Category(

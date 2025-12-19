@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from core.clipboard_manager import ClipboardManager
-from models.item import Item
+from src.core.clipboard_manager import ClipboardManager
+from src.models.item import Item
 
 
 class ClipboardController:

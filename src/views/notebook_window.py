@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
 from PyQt6.QtGui import QIcon, QAction
-from views.widgets.notebook_tab import NotebookTab
+from src.views.widgets.notebook_tab import NotebookTab
 import logging
 
 logger = logging.getLogger(__name__)

@@ -23,8 +23,8 @@ from PyQt6.QtGui import QPixmap, QImage, QClipboard
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QBuffer
 
-from core.config_manager import ConfigManager
-from utils.file_utils import (
+from src.core.config_manager import ConfigManager
+from src.utils.file_utils import (
     extract_file_metadata,
     ensure_directory_exists,
     sanitize_filename,

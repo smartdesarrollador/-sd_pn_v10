@@ -18,12 +18,12 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.process import Process, ProcessStep
-from models.category import Category
-from views.widgets.process_step_widget import ProcessStepWidget
-from views.widgets.item_widget import ItemButton
-from views.widgets.search_bar import SearchBar
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.models.process import Process, ProcessStep
+from src.models.category import Category
+from src.views.widgets.process_step_widget import ProcessStepWidget
+from src.views.widgets.item_widget import ItemButton
+from src.views.widgets.search_bar import SearchBar
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -1346,7 +1346,7 @@ class ProcessBuilderWindow(QWidget, TaskbarMinimizableMixin):
 
         try:
             # Import dialog
-            from views.dialogs.process_step_config_dialog import ProcessStepConfigDialog
+            from src.views.dialogs.process_step_config_dialog import ProcessStepConfigDialog
 
             # Create and show dialog
             dialog = ProcessStepConfigDialog(step, parent=self)
@@ -1827,7 +1827,7 @@ class ProcessBuilderWindow(QWidget, TaskbarMinimizableMixin):
     def on_manage_components(self):
         """Open component manager dialog"""
         try:
-            from views.dialogs.component_manager_dialog import ComponentManagerDialog
+            from src.views.dialogs.component_manager_dialog import ComponentManagerDialog
 
             dialog = ComponentManagerDialog(
                 component_manager=self.component_manager,

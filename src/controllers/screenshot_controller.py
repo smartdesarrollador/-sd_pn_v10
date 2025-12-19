@@ -19,9 +19,9 @@ from pathlib import Path
 from PyQt6.QtCore import QObject, QTimer, QRect
 from PyQt6.QtGui import QPixmap
 
-from core.screenshot_manager import ScreenshotManager
-from core.config_manager import ConfigManager
-from views.screenshot_overlay import ScreenshotOverlay
+from src.core.screenshot_manager import ScreenshotManager
+from src.core.config_manager import ConfigManager
+from src.views.screenshot_overlay import ScreenshotOverlay
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +253,7 @@ class ScreenshotController(QObject):
         Returns:
             int: ID del item creado o None si se omitió
         """
-        from views.dialogs.save_screenshot_dialog import SaveScreenshotDialog
+        from src.views.dialogs.save_screenshot_dialog import SaveScreenshotDialog
 
         try:
             # Obtener categorías

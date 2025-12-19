@@ -6,7 +6,7 @@ Incluye validación de sintaxis, tamaño y patrones peligrosos.
 import re
 from html.parser import HTMLParser
 from typing import Tuple, List
-from utils.constants import (
+from src.utils.constants import (
     WEB_STATIC_SIZE_SOFT_LIMIT,
     WEB_STATIC_SIZE_HARD_LIMIT,
     DANGEROUS_PATTERNS

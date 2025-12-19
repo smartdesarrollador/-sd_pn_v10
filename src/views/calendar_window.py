@@ -16,7 +16,7 @@ from .alerts.alerts_list import AlertsList
 from .dialogs.event_editor_dialog import EventEditorDialog
 from .dialogs.alert_editor_dialog import AlertEditorDialog
 from .dialogs.notification_dialog import NotificationDialog
-from core.alert_service import AlertService
+from src.core.alert_service import AlertService
 
 logger = logging.getLogger(__name__)
 

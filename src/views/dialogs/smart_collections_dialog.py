@@ -13,7 +13,7 @@ from pathlib import Path
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.smart_collections_manager import SmartCollectionsManager
+from src.core.smart_collections_manager import SmartCollectionsManager
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +431,7 @@ class SmartCollectionsDialog(QDialog):
     def create_new_collection(self):
         """Abrir diálogo para crear nueva colección"""
         try:
-            from views.dialogs.smart_collection_editor_dialog import SmartCollectionEditorDialog
+            from src.views.dialogs.smart_collection_editor_dialog import SmartCollectionEditorDialog
 
             dialog = SmartCollectionEditorDialog(self.db_path, parent=self)
             if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -448,7 +448,7 @@ class SmartCollectionsDialog(QDialog):
     def edit_collection(self, collection_id: int):
         """Abrir diálogo para editar colección"""
         try:
-            from views.dialogs.smart_collection_editor_dialog import SmartCollectionEditorDialog
+            from src.views.dialogs.smart_collection_editor_dialog import SmartCollectionEditorDialog
 
             dialog = SmartCollectionEditorDialog(self.db_path, collection_id=collection_id, parent=self)
             if dialog.exec() == QDialog.DialogCode.Accepted:

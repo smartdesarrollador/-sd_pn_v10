@@ -12,8 +12,8 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.search.advanced_search_engine import AdvancedSearchEngine
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.core.search.advanced_search_engine import AdvancedSearchEngine
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
 from .left_panel import LeftPanel
 
 logger = logging.getLogger(__name__)

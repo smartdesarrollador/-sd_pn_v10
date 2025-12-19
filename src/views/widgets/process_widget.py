@@ -21,7 +21,7 @@ from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.process import Process
+from src.models.process import Process
 
 # Get logger
 logger = logging.getLogger(__name__)

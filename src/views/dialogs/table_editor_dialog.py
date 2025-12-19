@@ -18,8 +18,8 @@ import pyperclip
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database.db_manager import DBManager
-from controllers.table_controller import TableController
+from src.database.db_manager import DBManager
+from src.controllers.table_controller import TableController
 
 logger = logging.getLogger(__name__)
 

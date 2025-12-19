@@ -9,24 +9,24 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.category import Category
-from models.item import Item
-from views.widgets.item_widget import ItemButton
-from views.widgets.list_widget import ListWidget
-from views.widgets.table_group_widget import TableGroupWidget
-from views.widgets.search_bar import SearchBar
-from views.advanced_filters_window import AdvancedFiltersWindow
-from views.dialogs.list_creator_dialog import ListCreatorDialog
-from views.dialogs.list_editor_dialog import ListEditorDialog
-from views.dialogs.table_view_dialog import TableViewDialog
-from core.search_engine import SearchEngine
-from core.advanced_filter_engine import AdvancedFilterEngine
+from src.models.category import Category
+from src.models.item import Item
+from src.views.widgets.item_widget import ItemButton
+from src.views.widgets.list_widget import ListWidget
+from src.views.widgets.table_group_widget import TableGroupWidget
+from src.views.widgets.search_bar import SearchBar
+from src.views.advanced_filters_window import AdvancedFiltersWindow
+from src.views.dialogs.list_creator_dialog import ListCreatorDialog
+from src.views.dialogs.list_editor_dialog import ListEditorDialog
+from src.views.dialogs.table_view_dialog import TableViewDialog
+from src.core.search_engine import SearchEngine
+from src.core.advanced_filter_engine import AdvancedFilterEngine
 from styles.futuristic_theme import get_theme
 from styles.animations import AnimationSystem, AnimationDurations
 from styles.effects import ParticleEffect, ScanLineEffect
 from styles.panel_styles import PanelStyles
-from utils.panel_resizer import PanelResizer
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.utils.panel_resizer import PanelResizer
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -788,7 +788,7 @@ class FloatingPanel(QWidget, TaskbarMinimizableMixin):
         logger.info(f"WEB_STATIC render requested: {item.label}")
 
         try:
-            from views.dialogs.embedded_browser_dialog import EmbeddedBrowserDialog
+            from src.views.dialogs.embedded_browser_dialog import EmbeddedBrowserDialog
 
             # Abrir diálogo con navegador embebido
             dialog = EmbeddedBrowserDialog(html_content=item.content, parent=self)
@@ -811,7 +811,7 @@ class FloatingPanel(QWidget, TaskbarMinimizableMixin):
         logger.info(f"Edit requested for item: {item.label}")
 
         try:
-            from views.item_editor_dialog import ItemEditorDialog
+            from src.views.item_editor_dialog import ItemEditorDialog
             from PyQt6.QtWidgets import QDialog
 
             # Create a simple controller wrapper that has config_manager
@@ -1092,7 +1092,7 @@ class FloatingPanel(QWidget, TaskbarMinimizableMixin):
                     all_items_from_db = self.config_manager.db.get_items_by_category(category_id)
 
                     # Actualizar items en la categoría
-                    from models.item import Item
+                    from src.models.item import Item
                     self.current_category.items = [Item.from_dict(item_dict) for item_dict in all_items_from_db]
 
                     # Separar items normales
@@ -1127,7 +1127,7 @@ class FloatingPanel(QWidget, TaskbarMinimizableMixin):
         # Luego aplicar búsqueda si hay query
         if query and query.strip():
             # Buscar en items
-            from models.category import Category
+            from src.models.category import Category
             temp_category = Category(
                 category_id="temp",
                 name="temp",

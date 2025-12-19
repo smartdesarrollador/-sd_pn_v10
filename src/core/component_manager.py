@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.component_type import ComponentType
-from models.item import Item, ItemType
+from src.models.component_type import ComponentType
+from src.models.item import Item, ItemType
 
 logger = logging.getLogger(__name__)
 

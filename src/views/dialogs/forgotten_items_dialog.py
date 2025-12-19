@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.stats_manager import StatsManager
+from src.core.stats_manager import StatsManager
 import logging
 
 logger = logging.getLogger(__name__)

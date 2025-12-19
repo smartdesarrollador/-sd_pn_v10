@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.widgets.stats_widget import StatsWidget
+from src.views.widgets.stats_widget import StatsWidget
 from styles.futuristic_theme import get_theme
 from styles.animations import AnimationSystem, AnimationDurations
 

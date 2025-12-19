@@ -16,9 +16,9 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.process import Process
-from views.widgets.search_bar import SearchBar
-from core.pinned_panels_manager import PinnedPanelsManager
+from src.models.process import Process
+from src.views.widgets.search_bar import SearchBar
+from src.core.pinned_panels_manager import PinnedPanelsManager
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -588,7 +588,7 @@ class ProcessesFloatingPanel(QWidget):
             self.processes_layout.addWidget(empty_label)
         else:
             # Import here to avoid circular import
-            from views.widgets.process_widget import ProcessWidget
+            from src.views.widgets.process_widget import ProcessWidget
 
             for process in self.visible_processes:
                 process_widget = ProcessWidget(process, parent=self)

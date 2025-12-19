@@ -18,10 +18,10 @@ import logging
 import os
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.item import Item, ItemType
-from views.widgets.project_tag_selector import ProjectTagSelector
-from core.global_tag_manager import GlobalTagManager
-from core.file_manager import FileManager
+from src.models.item import Item, ItemType
+from src.views.widgets.project_tag_selector import ProjectTagSelector
+from src.core.global_tag_manager import GlobalTagManager
+from src.core.file_manager import FileManager
 
 # Get logger
 logger = logging.getLogger(__name__)

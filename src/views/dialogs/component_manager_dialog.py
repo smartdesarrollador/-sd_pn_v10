@@ -15,8 +15,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.component_manager import ComponentManager
-from models.component_type import ComponentType
+from src.core.component_manager import ComponentManager
+from src.models.component_type import ComponentType
 
 logger = logging.getLogger(__name__)
 

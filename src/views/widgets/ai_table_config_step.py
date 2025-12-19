@@ -25,10 +25,10 @@ from PyQt6.QtGui import QFont
 # Agregar path al sys.path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database.db_manager import DBManager
-from models.ai_table_data import AITablePromptConfig
-from views.widgets.project_tag_selector import ProjectTagSelector
-from core.global_tag_manager import GlobalTagManager
+from src.database.db_manager import DBManager
+from src.models.ai_table_data import AITablePromptConfig
+from src.views.widgets.project_tag_selector import ProjectTagSelector
+from src.core.global_tag_manager import GlobalTagManager
 
 logger = logging.getLogger(__name__)
 

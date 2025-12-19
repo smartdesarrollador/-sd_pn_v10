@@ -13,7 +13,7 @@ from pathlib import Path
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.tag_groups_manager import TagGroupsManager
+from src.core.tag_groups_manager import TagGroupsManager
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +379,7 @@ class TagGroupsDialog(QDialog):
         """Abrir diálogo para crear nuevo grupo"""
         try:
             # Importar aquí para evitar dependencias circulares
-            from views.dialogs.tag_group_editor_dialog import TagGroupEditorDialog
+            from src.views.dialogs.tag_group_editor_dialog import TagGroupEditorDialog
 
             dialog = TagGroupEditorDialog(self.db_path, parent=self)
             if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -397,7 +397,7 @@ class TagGroupsDialog(QDialog):
     def edit_group(self, group_id: int):
         """Abrir diálogo para editar grupo"""
         try:
-            from views.dialogs.tag_group_editor_dialog import TagGroupEditorDialog
+            from src.views.dialogs.tag_group_editor_dialog import TagGroupEditorDialog
 
             dialog = TagGroupEditorDialog(self.db_path, group_id=group_id, parent=self)
             if dialog.exec() == QDialog.DialogCode.Accepted:

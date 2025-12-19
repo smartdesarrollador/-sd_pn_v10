@@ -10,9 +10,9 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.category import Category
-from views.widgets.button_widget import CategoryButton
-from views.widgets.notification_badge import NotificationBadge
+from src.models.category import Category
+from src.views.widgets.button_widget import CategoryButton
+from src.views.widgets.notification_badge import NotificationBadge
 from styles.futuristic_theme import get_theme
 from styles.effects import ScanLineEffect
 
@@ -720,7 +720,7 @@ class Sidebar(QWidget):
 
     def load_active_processes(self, processes):
         """Load and create buttons for active processes"""
-        from views.widgets.process_button import ProcessButton
+        from src.views.widgets.process_button import ProcessButton
 
         # Clear existing process buttons
         self.clear_process_buttons()
@@ -864,7 +864,7 @@ class Sidebar(QWidget):
     def show_today_notifications(self):
         """Show popup with today's events and alerts"""
         try:
-            from views.dialogs.today_notifications_dialog import TodayNotificationsDialog
+            from src.views.dialogs.today_notifications_dialog import TodayNotificationsDialog
 
             # Get today's data
             data = self.db.get_today_events_and_alerts()
@@ -962,7 +962,7 @@ class Sidebar(QWidget):
     def on_quick_access_clicked(self):
         """Handle quick access button click - show/hide quick access panel"""
         if not hasattr(self, 'quick_access_panel') or self.quick_access_panel is None:
-            from views.quick_access_panel import QuickAccessPanel
+            from src.views.quick_access_panel import QuickAccessPanel
             self.quick_access_panel = QuickAccessPanel(self)
 
             # Connect signals if controller is available
@@ -1011,7 +1011,7 @@ class Sidebar(QWidget):
 
         if not hasattr(self, 'notebook_window') or self.notebook_window is None:
             # Crear ventana
-            from views.notebook_window import NotebookWindow
+            from src.views.notebook_window import NotebookWindow
             self.notebook_window = NotebookWindow(self.controller)
 
             # Posicionar al lado del sidebar

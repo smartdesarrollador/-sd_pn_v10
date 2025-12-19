@@ -18,7 +18,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.item import Item
+from src.models.item import Item
 
 logger = logging.getLogger(__name__)
 

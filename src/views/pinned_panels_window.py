@@ -12,8 +12,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.widgets.pinned_panel_card import PinnedPanelCard
-from views.dialogs.panel_config_dialog import PanelConfigDialog
+from src.views.widgets.pinned_panel_card import PinnedPanelCard
+from src.views.dialogs.panel_config_dialog import PanelConfigDialog
 import logging
 
 logger = logging.getLogger(__name__)

@@ -416,7 +416,7 @@ class ProjectEntitySelector(QDialog):
 
     def _create_new_item(self):
         """Crea un nuevo item"""
-        from views.dialogs.quick_create_dialog import QuickCreateDialog
+        from src.views.dialogs.quick_create_dialog import QuickCreateDialog
 
         dialog = QuickCreateDialog(self.db, parent=self)
 
@@ -463,7 +463,7 @@ class ProjectEntitySelector(QDialog):
 
     def _create_new_category(self):
         """Crea una nueva categoría"""
-        from views.dialogs.category_form_dialog import CategoryFormDialog
+        from src.views.dialogs.category_form_dialog import CategoryFormDialog
 
         dialog = CategoryFormDialog(self.db, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -471,7 +471,7 @@ class ProjectEntitySelector(QDialog):
 
     def _create_new_list(self):
         """Crea una nueva lista"""
-        from views.dialogs.list_creator_dialog import ListCreatorDialog
+        from src.views.dialogs.list_creator_dialog import ListCreatorDialog
 
         dialog = ListCreatorDialog(self.db, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -479,7 +479,7 @@ class ProjectEntitySelector(QDialog):
 
     def _create_new_table(self):
         """Crea una nueva tabla"""
-        from views.dialogs.table_creator_wizard import TableCreatorWizard
+        from src.views.dialogs.table_creator_wizard import TableCreatorWizard
 
         wizard = TableCreatorWizard(self.db, parent=self)
         if wizard.exec() == QDialog.DialogCode.Accepted:

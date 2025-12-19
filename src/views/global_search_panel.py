@@ -10,16 +10,16 @@ import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.item import Item, ItemType
-from views.widgets.item_widget import ItemButton
-from views.widgets.search_bar import SearchBar
-from views.advanced_filters_window import AdvancedFiltersWindow
-from core.search_engine import SearchEngine
-from core.advanced_filter_engine import AdvancedFilterEngine
-from core.pinned_panels_manager import PinnedPanelsManager
+from src.models.item import Item, ItemType
+from src.views.widgets.item_widget import ItemButton
+from src.views.widgets.search_bar import SearchBar
+from src.views.advanced_filters_window import AdvancedFiltersWindow
+from src.core.search_engine import SearchEngine
+from src.core.advanced_filter_engine import AdvancedFilterEngine
+from src.core.pinned_panels_manager import PinnedPanelsManager
 from styles.panel_styles import PanelStyles
-from utils.panel_resizer import PanelResizer
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.utils.panel_resizer import PanelResizer
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -751,7 +751,7 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
         logger.info(f"Edit requested for item: {item.label}")
 
         try:
-            from views.item_editor_dialog import ItemEditorDialog
+            from src.views.item_editor_dialog import ItemEditorDialog
             from PyQt6.QtWidgets import QDialog
 
             # Create a simple controller wrapper that has config_manager
@@ -1566,7 +1566,7 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
             return
 
         # Abrir diálogo de selección de categoría y creación de lista
-        from views.dialogs.create_list_from_search_dialog import CreateListFromSearchDialog
+        from src.views.dialogs.create_list_from_search_dialog import CreateListFromSearchDialog
 
         creator_dialog = CreateListFromSearchDialog(
             items=visible_items,

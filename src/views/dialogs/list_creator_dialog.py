@@ -17,9 +17,9 @@ from PyQt6.QtGui import QFont
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from views.widgets.step_item_widget import StepItemWidget
-from views.widgets.tag_group_selector import TagGroupSelector
-from controllers.list_controller import ListController
+from src.views.widgets.step_item_widget import StepItemWidget
+from src.views.widgets.tag_group_selector import TagGroupSelector
+from src.controllers.list_controller import ListController
 
 logger = logging.getLogger(__name__)
 

@@ -1666,7 +1666,7 @@ class SimpleBrowserWindow(QWidget):
                 return
 
             # Obtener categorías de la base de datos
-            from models.category import Category
+            from src.models.category import Category
             categories_data = self.db.get_categories()
 
             # Mapear correctamente los datos (id -> category_id)
@@ -1771,7 +1771,7 @@ class SimpleBrowserWindow(QWidget):
                 return
 
             # Obtener categorías de la base de datos
-            from models.category import Category
+            from src.models.category import Category
             categories_data = self.db.get_categories()
 
             # Mapear correctamente los datos (id -> category_id)
@@ -1918,7 +1918,7 @@ class SimpleBrowserWindow(QWidget):
                 logger.info(f"[save_file_as_path_item] Archivo descargado a: {temp_file_path}")
 
                 # Obtener categorías de la base de datos
-                from models.category import Category
+                from src.models.category import Category
                 categories_data = self.db.get_categories()
 
                 # Mapear correctamente los datos (id -> category_id)
@@ -1945,7 +1945,7 @@ class SimpleBrowserWindow(QWidget):
                     return
 
                 # Abrir ItemEditorDialog con el archivo pre-cargado
-                from views.item_editor_dialog import ItemEditorDialog
+                from src.views.item_editor_dialog import ItemEditorDialog
 
                 # Necesitamos un controller mock o usar el existente
                 # El dialog necesita category_id, así que pediremos al usuario seleccionar categoría primero
@@ -1986,8 +1986,8 @@ class SimpleBrowserWindow(QWidget):
 
                 # Asegurar que el dialog tenga file_manager y db_manager
                 if not hasattr(dialog, 'file_manager') or dialog.file_manager is None:
-                    from core.config_manager import ConfigManager
-                    from core.file_manager import FileManager
+                    from src.core.config_manager import ConfigManager
+                    from src.core.file_manager import FileManager
                     db_path = str(self.db.db_path) if hasattr(self.db, 'db_path') else "widget_sidebar.db"
                     config_manager = ConfigManager(db_path)
                     dialog.file_manager = FileManager(config_manager)

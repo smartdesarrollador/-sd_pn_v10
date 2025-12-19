@@ -19,11 +19,11 @@ import pyperclip
 # Agregar path al sys.path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database.db_manager import DBManager
-from views.dialogs.table_export_dialog import TableExportDialog
-from views.dialogs.table_editor_dialog import TableEditorDialog
-from views.dialogs.table_rename_dialog import TableRenameDialog
-from controllers.table_controller import TableController
+from src.database.db_manager import DBManager
+from src.views.dialogs.table_export_dialog import TableExportDialog
+from src.views.dialogs.table_editor_dialog import TableEditorDialog
+from src.views.dialogs.table_rename_dialog import TableRenameDialog
+from src.controllers.table_controller import TableController
 
 logger = logging.getLogger(__name__)
 
@@ -648,7 +648,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Crear instancia de DBManager
-    from database.db_manager import DBManager
+    from src.database.db_manager import DBManager
     db = DBManager()
 
     # Mostrar diálogo con tabla de prueba

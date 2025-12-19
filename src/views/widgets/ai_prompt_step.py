@@ -19,8 +19,8 @@ import pyperclip
 # Agregar path al sys.path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.ai_bulk_manager import AIBulkItemManager
-from models.bulk_item_data import BulkImportConfig
+from src.core.ai_bulk_manager import AIBulkItemManager
+from src.models.bulk_item_data import BulkImportConfig
 
 logger = logging.getLogger(__name__)
 

@@ -25,8 +25,8 @@ class NotificationManager:
 
         try:
             # Importar managers
-            from core.stats_manager import StatsManager
-            from core.favorites_manager import FavoritesManager
+            from src.core.stats_manager import StatsManager
+            from src.core.favorites_manager import FavoritesManager
 
             stats_manager = StatsManager(self.db_path)
             favorites_manager = FavoritesManager(self.db_path)

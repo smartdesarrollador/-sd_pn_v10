@@ -11,13 +11,13 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QBrush, QColor, QShortcut, QKeySequence
 import logging
 
-from core.dashboard_manager import DashboardManager
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
-from views.dashboard.search_bar_widget import SearchBarWidget
-from views.dashboard.highlight_delegate import HighlightDelegate
-from views.dashboard.action_bar_widget import ActionBarWidget
-from views.dashboard.selection_utils_widget import SelectionUtilsWidget
-from views.dashboard.tags_filter_sidebar import TagsFilterSidebar
+from src.core.dashboard_manager import DashboardManager
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.views.dashboard.search_bar_widget import SearchBarWidget
+from src.views.dashboard.highlight_delegate import HighlightDelegate
+from src.views.dashboard.action_bar_widget import ActionBarWidget
+from src.views.dashboard.selection_utils_widget import SelectionUtilsWidget
+from src.views.dashboard.tags_filter_sidebar import TagsFilterSidebar
 
 logger = logging.getLogger(__name__)
 
@@ -2463,7 +2463,7 @@ class StructureDashboard(QDialog, TaskbarMinimizableMixin):
         """Copy item content to clipboard"""
         # Si el item es sensible, verificar contraseña maestra
         if data.get('is_sensitive', False):
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             item_name = data.get('name', 'item sensible')
             verified = MasterPasswordDialog.verify(
@@ -2496,7 +2496,7 @@ class StructureDashboard(QDialog, TaskbarMinimizableMixin):
 
         # Si el item es sensible, verificar contraseña maestra
         if data.get('is_sensitive', False):
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             item_name = data.get('name', item.text(0))
             verified = MasterPasswordDialog.verify(

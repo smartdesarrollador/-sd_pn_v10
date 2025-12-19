@@ -14,8 +14,8 @@ from pathlib import Path
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.smart_collections_manager import SmartCollectionsManager
-from database.db_manager import DBManager
+from src.core.smart_collections_manager import SmartCollectionsManager
+from src.database.db_manager import DBManager
 
 logger = logging.getLogger(__name__)
 

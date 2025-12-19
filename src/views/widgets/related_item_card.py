@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.item import Item, ItemType
+from src.models.item import Item, ItemType
 from styles.panel_styles import PanelStyles
 from styles.futuristic_theme import get_theme
 

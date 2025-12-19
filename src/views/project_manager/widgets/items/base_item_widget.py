@@ -96,7 +96,7 @@ class BaseItemWidget(QFrame):
         """
         # Si el item es sensible, verificar contraseña maestra
         if self.item_data.get('is_sensitive', False):
-            from views.dialogs.master_password_dialog import MasterPasswordDialog
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
             item_label = self.item_data.get('label', 'item sensible')
             verified = MasterPasswordDialog.verify(

@@ -15,10 +15,10 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.process import Process
-from core.process_manager import ProcessManager
-from core.process_executor import ProcessExecutor
-from database.db_manager import DBManager
+from src.models.process import Process
+from src.core.process_manager import ProcessManager
+from src.core.process_executor import ProcessExecutor
+from src.database.db_manager import DBManager
 
 logger = logging.getLogger(__name__)
 

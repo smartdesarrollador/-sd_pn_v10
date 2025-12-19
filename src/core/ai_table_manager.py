@@ -16,15 +16,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.ai_table_data import (
+from src.models.ai_table_data import (
     AITableData, TableConfigData, TableStructureData,
     TableColumnConfig, AITablePromptConfig, TableValidationResult
 )
-from utils.ai_table_prompt_templates import AITablePromptTemplate
-from utils.ai_table_json_validator import AITableJSONValidator
-from utils.column_type_detector import ColumnTypeDetector
-from controllers.table_controller import TableController
-from database.db_manager import DBManager
+from src.utils.ai_table_prompt_templates import AITablePromptTemplate
+from src.utils.ai_table_json_validator import AITableJSONValidator
+from src.utils.column_type_detector import ColumnTypeDetector
+from src.controllers.table_controller import TableController
+from src.database.db_manager import DBManager
 
 logger = logging.getLogger(__name__)
 

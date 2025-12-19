@@ -73,7 +73,10 @@
       "Bash(copy:*)",
       "Bash(start /B python:*)",
       "Bash(if not exist \"src\\views\\calendar\" mkdir \"src\\views\\calendar\")",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(test:*)",
+      "Bash(./venv/Scripts/python.exe -m pip:*)",
+      "Bash(./venv/Scripts/python.exe:*)"
     ],
     "deny": [],
     "ask": []

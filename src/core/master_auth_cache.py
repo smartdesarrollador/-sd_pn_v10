@@ -146,7 +146,7 @@ def get_master_auth_cache() -> MasterAuthCache:
         Global MasterAuthCache instance
 
     Example:
-        from core.master_auth_cache import get_master_auth_cache
+        from src.core.master_auth_cache import get_master_auth_cache
 
         cache = get_master_auth_cache()
         if cache.is_authenticated():

@@ -12,32 +12,32 @@ import ctypes
 from ctypes import wintypes
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.sidebar import Sidebar
-from views.floating_panel import FloatingPanel
-from views.global_search_panel import GlobalSearchPanel
-from views.advanced_search import AdvancedSearchWindow
-from views.favorites_floating_panel import FavoritesFloatingPanel
-from views.stats_floating_panel import StatsFloatingPanel
-from views.settings_window import SettingsWindow
-from views.calendar_window import CalendarWindow
-from views.pinned_panels_window import PinnedPanelsWindow
-from views.pinned_panels_manager_window import PinnedPanelsManagerWindow
-from views.dialogs.popular_items_dialog import PopularItemsDialog
-from views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
-from views.dialogs.suggestions_dialog import FavoriteSuggestionsDialog
-from views.dialogs.stats_dashboard import StatsDashboard
-from views.dialogs.panel_config_dialog import PanelConfigDialog
-from views.dialogs.quick_create_dialog import QuickCreateDialog
-from views.dialogs.table_creator_wizard import TableCreatorWizard
-from views.dialogs.universal_search_dialog import UniversalSearchDialog
-from views.item_editor_dialog import ItemEditorDialog
-from views.category_filter_window import CategoryFilterWindow
-from models.item import Item
-from core.hotkey_manager import HotkeyManager
-from core.tray_manager import TrayManager
-from core.session_manager import SessionManager
-from core.notification_manager import NotificationManager
-from core.taskbar_minimizable_mixin import make_window_minimizable
+from src.views.sidebar import Sidebar
+from src.views.floating_panel import FloatingPanel
+from src.views.global_search_panel import GlobalSearchPanel
+from src.views.advanced_search import AdvancedSearchWindow
+from src.views.favorites_floating_panel import FavoritesFloatingPanel
+from src.views.stats_floating_panel import StatsFloatingPanel
+from src.views.settings_window import SettingsWindow
+from src.views.calendar_window import CalendarWindow
+from src.views.pinned_panels_window import PinnedPanelsWindow
+from src.views.pinned_panels_manager_window import PinnedPanelsManagerWindow
+from src.views.dialogs.popular_items_dialog import PopularItemsDialog
+from src.views.dialogs.forgotten_items_dialog import ForgottenItemsDialog
+from src.views.dialogs.suggestions_dialog import FavoriteSuggestionsDialog
+from src.views.dialogs.stats_dashboard import StatsDashboard
+from src.views.dialogs.panel_config_dialog import PanelConfigDialog
+from src.views.dialogs.quick_create_dialog import QuickCreateDialog
+from src.views.dialogs.table_creator_wizard import TableCreatorWizard
+from src.views.dialogs.universal_search_dialog import UniversalSearchDialog
+from src.views.item_editor_dialog import ItemEditorDialog
+from src.views.category_filter_window import CategoryFilterWindow
+from src.models.item import Item
+from src.core.hotkey_manager import HotkeyManager
+from src.core.tray_manager import TrayManager
+from src.core.session_manager import SessionManager
+from src.core.notification_manager import NotificationManager
+from src.core.taskbar_minimizable_mixin import make_window_minimizable
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -605,7 +605,7 @@ class MainWindow(QMainWindow):
             category_id = item_data.get('category_id')
 
             # Crear objeto Item desde dict usando el método from_dict
-            from models.item import Item
+            from src.models.item import Item
             item = Item.from_dict(item_data)
 
             # Abrir ItemEditorDialog
@@ -864,8 +864,8 @@ class MainWindow(QMainWindow):
 
             # Create image gallery window if it doesn't exist
             if not hasattr(self, 'image_gallery_window') or not self.image_gallery_window:
-                from controllers.image_gallery_controller import ImageGalleryController
-                from views.image_gallery import ImageGalleryWindow
+                from src.controllers.image_gallery_controller import ImageGalleryController
+                from src.views.image_gallery import ImageGalleryWindow
 
                 # Get db_manager from controller's config_manager
                 db_manager = self.config_manager.db if self.config_manager else None
@@ -920,7 +920,7 @@ class MainWindow(QMainWindow):
 
             # Create projects window if it doesn't exist
             if not hasattr(self, 'projects_window') or not self.projects_window:
-                from views.projects_window import ProjectsWindow
+                from src.views.projects_window import ProjectsWindow
 
                 # Get db_manager from controller's config_manager
                 db_manager = self.config_manager.db if self.config_manager else None
@@ -984,7 +984,7 @@ class MainWindow(QMainWindow):
 
             # Create areas window if it doesn't exist
             if not hasattr(self, 'areas_window') or not self.areas_window:
-                from views.areas_window import AreasWindow
+                from src.views.areas_window import AreasWindow
 
                 # Get db_manager from controller's config_manager
                 db_manager = self.config_manager.db if self.config_manager else None
@@ -1196,7 +1196,7 @@ class MainWindow(QMainWindow):
             logger.info("AI Bulk button clicked")
 
             # Import dialog aquí para evitar circular imports
-            from views.dialogs.ai_bulk_wizard import AIBulkWizard
+            from src.views.dialogs.ai_bulk_wizard import AIBulkWizard
 
             # Obtener DBManager del controller
             if not self.controller or not hasattr(self.controller, 'config_manager'):
@@ -1231,7 +1231,7 @@ class MainWindow(QMainWindow):
             logger.info("Bulk Item Creator button clicked")
 
             # Import window aquí para evitar circular imports
-            from views.bulk_item_creator_dialog import BulkItemCreatorDialog
+            from src.views.bulk_item_creator_dialog import BulkItemCreatorDialog
 
             # Si no existe la ventana, crearla
             if not hasattr(self, 'bulk_creator_window') or self.bulk_creator_window is None:
@@ -1276,7 +1276,7 @@ class MainWindow(QMainWindow):
             logger.info("AI Table button clicked")
 
             # Import dialog aquí para evitar circular imports
-            from views.dialogs.ai_table_wizard import AITableCreatorWizard
+            from src.views.dialogs.ai_table_wizard import AITableCreatorWizard
 
             # Obtener DBManager del controller
             if not self.controller or not hasattr(self.controller, 'config_manager'):
@@ -1401,7 +1401,7 @@ class MainWindow(QMainWindow):
             db_manager = self.controller.config_manager.db
 
             # Importar TablesManagerWindow
-            from views.tables_manager_window import TablesManagerWindow
+            from src.views.tables_manager_window import TablesManagerWindow
 
             # Crear y mostrar ventana de gestión
             tables_manager = TablesManagerWindow(db_manager, self.controller, self)
@@ -1536,7 +1536,7 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            from views.dashboard.structure_dashboard import StructureDashboard
+            from src.views.dashboard.structure_dashboard import StructureDashboard
 
             # Create dashboard as non-modal window
             dashboard = StructureDashboard(
@@ -1612,7 +1612,7 @@ class MainWindow(QMainWindow):
 
             # Crear ventana si no existe
             if not hasattr(self, 'category_manager_window') or not self.category_manager_window:
-                from views.dialogs.category_manager_window import CategoryManagerWindow
+                from src.views.dialogs.category_manager_window import CategoryManagerWindow
                 self.category_manager_window = CategoryManagerWindow(
                     controller=self.controller,
                     parent=None  # Sin parent para que sea ventana independiente
@@ -1796,7 +1796,7 @@ class MainWindow(QMainWindow):
                 return
 
             # Import ProcessBuilderWindow
-            from views.process_builder_window import ProcessBuilderWindow
+            from src.views.process_builder_window import ProcessBuilderWindow
 
             # Create and show process builder window
             builder_window = ProcessBuilderWindow(
@@ -1858,7 +1858,7 @@ class MainWindow(QMainWindow):
                 return
 
             # Import ProcessesFloatingPanel
-            from views.processes_floating_panel import ProcessesFloatingPanel
+            from src.views.processes_floating_panel import ProcessesFloatingPanel
 
             # Check if panel already exists and is not pinned
             if hasattr(self, 'processes_panel') and self.processes_panel and not self.processes_panel.is_pinned:
@@ -1940,7 +1940,7 @@ class MainWindow(QMainWindow):
 
             # Create new panel if needed
             if not self.current_process_panel:
-                from views.process_floating_panel import ProcessFloatingPanel
+                from src.views.process_floating_panel import ProcessFloatingPanel
 
                 self.current_process_panel = ProcessFloatingPanel(
                     process_controller=self.controller.process_controller,
@@ -2027,7 +2027,7 @@ class MainWindow(QMainWindow):
             logger.info(f"Edit requested for process {process_id}")
 
             # Import ProcessBuilderWindow
-            from views.process_builder_window import ProcessBuilderWindow
+            from src.views.process_builder_window import ProcessBuilderWindow
 
             # Create builder window in edit mode
             builder_window = ProcessBuilderWindow(
@@ -2090,9 +2090,9 @@ class MainWindow(QMainWindow):
             True if access granted (password verified OR no master password configured)
             False if access denied (user cancelled or wrong password)
         """
-        from core.master_password_manager import MasterPasswordManager
-        from core.master_auth_cache import get_master_auth_cache
-        from views.dialogs.master_password_dialog import MasterPasswordDialog
+        from src.core.master_password_manager import MasterPasswordManager
+        from src.core.master_auth_cache import get_master_auth_cache
+        from src.views.dialogs.master_password_dialog import MasterPasswordDialog
 
         master_mgr = MasterPasswordManager()
 
@@ -2404,7 +2404,7 @@ class MainWindow(QMainWindow):
     def open_component_manager(self):
         """Open component manager dialog"""
         print("Opening component manager...")
-        from views.dialogs.component_manager_dialog import ComponentManagerDialog
+        from src.views.dialogs.component_manager_dialog import ComponentManagerDialog
 
         dialog = ComponentManagerDialog(
             component_manager=self.controller.component_manager,
@@ -2923,7 +2923,7 @@ class MainWindow(QMainWindow):
                     config = self.controller.pinned_panels_manager.restore_global_search_panel(panel_data)
 
                     # Crear nuevo panel de búsqueda global
-                    from views.global_search_panel import GlobalSearchPanel
+                    from src.views.global_search_panel import GlobalSearchPanel
                     restored_panel = GlobalSearchPanel(
                         db_manager=self.config_manager.db if self.config_manager else None,
                         config_manager=self.config_manager,
@@ -3035,7 +3035,7 @@ class MainWindow(QMainWindow):
                         continue
 
                     # Create new process floating panel
-                    from views.process_floating_panel import ProcessFloatingPanel
+                    from src.views.process_floating_panel import ProcessFloatingPanel
 
                     restored_panel = ProcessFloatingPanel(
                         process_controller=self.controller.process_controller,
@@ -3137,7 +3137,7 @@ class MainWindow(QMainWindow):
                     return
 
             # Create new global search panel
-            from views.global_search_panel import GlobalSearchPanel
+            from src.views.global_search_panel import GlobalSearchPanel
             restored_panel = GlobalSearchPanel(
                 db_manager=self.config_manager.db if self.config_manager else None,
                 config_manager=self.config_manager,

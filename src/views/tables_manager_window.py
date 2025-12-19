@@ -16,10 +16,10 @@ from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.db_manager import DBManager
-from controllers.table_controller import TableController
-from views.dialogs.table_view_dialog import TableViewDialog
-from views.dialogs.table_creator_wizard import TableCreatorWizard
+from src.database.db_manager import DBManager
+from src.controllers.table_controller import TableController
+from src.views.dialogs.table_view_dialog import TableViewDialog
+from src.views.dialogs.table_creator_wizard import TableCreatorWizard
 
 logger = logging.getLogger(__name__)
 

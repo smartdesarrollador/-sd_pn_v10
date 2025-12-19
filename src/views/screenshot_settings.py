@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
-from core.config_manager import ConfigManager
-from views.widgets.hotkey_input import HotkeyInput
+from src.core.config_manager import ConfigManager
+from src.views.widgets.hotkey_input import HotkeyInput
 
 
 class ScreenshotSettings(QWidget):

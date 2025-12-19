@@ -12,8 +12,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.favorites_manager import FavoritesManager
-from core.usage_tracker import UsageTracker
+from src.core.favorites_manager import FavoritesManager
+from src.core.usage_tracker import UsageTracker
 import logging
 
 logger = logging.getLogger(__name__)

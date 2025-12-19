@@ -1,105 +1,45 @@
 @echo off
-REM Build script for Widget Sidebar
-REM Compiles the application to a standalone .exe using PyInstaller
-
-echo ============================================================
-echo Widget Sidebar - Build Script
-echo ============================================================
+echo ========================================
+echo Widget Sidebar - PyInstaller Build
+echo ========================================
 echo.
 
-REM Check if PyInstaller is installed
-python -c "import PyInstaller" 2>nul
-if errorlevel 1 (
-    echo PyInstaller not found. Installing...
-    pip install pyinstaller
-    if errorlevel 1 (
-        echo Failed to install PyInstaller
-        pause
-        exit /b 1
-    )
-)
-
+REM Step 1: Clean previous builds
 echo Cleaning previous builds...
-if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
+if exist "build" rmdir /S /Q build
+if exist "dist" rmdir /S /Q dist
+
+REM Step 2: Migration disabled (base de datos se crea automáticamente)
+echo Migration step skipped (database will be created on first run)
 echo.
 
-REM Step 1: Create backup of JSON files
-echo Creating backup of JSON configuration files...
-if exist config.json (
-    copy config.json config.json.backup >nul 2>&1
-    echo   - config.json.backup created
-)
-if exist default_categories.json (
-    copy default_categories.json default_categories.json.backup >nul 2>&1
-    echo   - default_categories.json.backup created
-)
-echo.
-
-REM Step 2: Run migration to SQLite
-echo Running migration from JSON to SQLite...
-python run_migration.py >nul 2>&1
-if errorlevel 1 (
-    echo   WARNING: Migration may have failed, but continuing build...
-) else (
-    echo   - Migration completed successfully
-)
-echo.
-
+REM Step 3: Build con PyInstaller del venv (CRITICO)
 echo Starting PyInstaller build...
-pyinstaller widget_sidebar.spec --clean --noconfirm
+echo Using venv PyInstaller...
+.\venv\Scripts\pyinstaller.exe widget_sidebar.spec --clean --noconfirm
 
-if errorlevel 1 (
+if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo ============================================================
-    echo Build FAILED
-    echo ============================================================
+    echo [ERROR] Build failed!
     pause
     exit /b 1
 )
 
 echo.
-echo Copying additional files to dist...
+echo ========================================
+echo Build completed successfully!
+echo ========================================
+echo Executable location: dist\WidgetSidebar\WidgetSidebar.exe
+echo.
 
-REM Copy database to dist folder
-if exist widget_sidebar.db (
-    copy widget_sidebar.db dist\ >nul 2>&1
-    echo   - widget_sidebar.db copied to dist
+REM Step 4: Copy README (opcional)
+if exist "README.md" (
+    copy README.md dist\WidgetSidebar\
+    echo README.md copied to distribution folder
 )
 
-REM Copy README and documentation to dist folder
-if exist USER_GUIDE.md (
-    copy USER_GUIDE.md dist\ >nul 2>&1
-    echo   - USER_GUIDE.md copied to dist
-)
-if exist README.md (
-    copy README.md dist\ >nul 2>&1
-    echo   - README.md copied to dist
-)
-if exist LICENSE (
-    copy LICENSE dist\ >nul 2>&1
-    echo   - LICENSE copied to dist
-)
-
-REM Create distribution folder with version
 echo.
-echo Creating distribution package...
-set VERSION=2.0
-if not exist "WidgetSidebar_v%VERSION%" mkdir "WidgetSidebar_v%VERSION%"
-xcopy /E /I /Y dist "WidgetSidebar_v%VERSION%" >nul 2>&1
-echo   - Distribution package created: WidgetSidebar_v%VERSION%\
-
-echo.
-echo ============================================================
-echo Build SUCCESSFUL
-echo ============================================================
-echo.
-echo Executable location: dist\WidgetSidebar.exe
-echo Distribution package: WidgetSidebar_v%VERSION%\
-echo.
-echo You can now run the application by executing:
-echo   dist\WidgetSidebar.exe
-echo.
-echo Or distribute the WidgetSidebar_v%VERSION% folder
+echo To create distribution package, run:
+echo   xcopy /E /I /Y dist\WidgetSidebar WidgetSidebar_v3.0
 echo.
 pause

@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from views.widgets.tag_group_selector import TagGroupSelector
+from src.views.widgets.tag_group_selector import TagGroupSelector
 
 logger = logging.getLogger(__name__)
 

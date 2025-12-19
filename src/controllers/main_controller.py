@@ -6,20 +6,20 @@ from pathlib import Path
 from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from core.config_manager import ConfigManager
-from core.clipboard_manager import ClipboardManager
-from core.category_filter_engine import CategoryFilterEngine
-from core.pinned_panels_manager import PinnedPanelsManager
-from core.simple_browser_manager import SimpleBrowserManager
-from core.notebook_manager import NotebookManager
-from core.workarea_manager import WorkareaManager
-from core.component_manager import ComponentManager
-from core.project_manager import ProjectManager
-from controllers.clipboard_controller import ClipboardController
-from controllers.list_controller import ListController
-from controllers.process_controller import ProcessController
-from models.category import Category
-from models.item import Item
+from src.core.config_manager import ConfigManager
+from src.core.clipboard_manager import ClipboardManager
+from src.core.category_filter_engine import CategoryFilterEngine
+from src.core.pinned_panels_manager import PinnedPanelsManager
+from src.core.simple_browser_manager import SimpleBrowserManager
+from src.core.notebook_manager import NotebookManager
+from src.core.workarea_manager import WorkareaManager
+from src.core.component_manager import ComponentManager
+from src.core.project_manager import ProjectManager
+from src.controllers.clipboard_controller import ClipboardController
+from src.controllers.list_controller import ListController
+from src.controllers.process_controller import ProcessController
+from src.models.category import Category
+from src.models.item import Item
 import logging
 
 logger = logging.getLogger(__name__)
@@ -51,11 +51,11 @@ class MainController:
         )
 
         # Initialize screenshot controller
-        from controllers.screenshot_controller import ScreenshotController
+        from src.controllers.screenshot_controller import ScreenshotController
         self.screenshot_controller = ScreenshotController(self)
 
         # Initialize hotkey manager
-        from core.hotkey_manager import HotkeyManager
+        from src.core.hotkey_manager import HotkeyManager
         self.hotkey_manager = HotkeyManager()
 
         # Data
@@ -329,7 +329,7 @@ class MainController:
             True si se creó un item exitosamente, False si no
         """
         try:
-            from views.dialogs.create_web_static_item_wizard import CreateWebStaticItemWizard
+            from src.views.dialogs.create_web_static_item_wizard import CreateWebStaticItemWizard
 
             logger.info("Opening Create Web Static Item Wizard")
             wizard = CreateWebStaticItemWizard(self, parent)

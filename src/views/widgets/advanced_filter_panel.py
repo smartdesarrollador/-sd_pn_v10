@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from models.item import ItemType
+from src.models.item import ItemType
 
 # Get logger
 logger = logging.getLogger(__name__)

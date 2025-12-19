@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
-from core.config_manager import ConfigManager
-from core.file_manager import FileManager
+from src.core.config_manager import ConfigManager
+from src.core.file_manager import FileManager
 
 
 class FilesSettings(QWidget):
@@ -482,7 +482,7 @@ class FilesSettings(QWidget):
         # Contar archivos guardados (items con file_hash)
         # Esto requiere acceso a DBManager
         try:
-            from database.db_manager import DBManager
+            from src.database.db_manager import DBManager
             db_path = Path(__file__).parent.parent.parent / "widget_sidebar.db"
             db = DBManager(str(db_path))
 

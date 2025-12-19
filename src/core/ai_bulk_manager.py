@@ -12,16 +12,16 @@ import logging
 import time
 from typing import List, Dict, Any, Optional, Tuple
 
-from models.bulk_item_data import (
+from src.models.bulk_item_data import (
     BulkItemData,
     BulkItemDefaults,
     BulkImportConfig,
     ValidationResult,
     BulkCreationResult
 )
-from utils.json_validator import BulkJSONValidator
-from utils.prompt_templates import PromptTemplate
-from database.db_manager import DBManager
+from src.utils.json_validator import BulkJSONValidator
+from src.utils.prompt_templates import PromptTemplate
+from src.database.db_manager import DBManager
 
 logger = logging.getLogger(__name__)
 

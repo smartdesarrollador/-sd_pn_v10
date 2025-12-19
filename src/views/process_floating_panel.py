@@ -11,15 +11,15 @@ import webbrowser
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.process import Process
-from models.item import Item
-from views.widgets.item_widget import ItemButton
-from views.widgets.list_widget import ListWidget
-from views.widgets.search_bar import SearchBar
+from src.models.process import Process
+from src.models.item import Item
+from src.views.widgets.item_widget import ItemButton
+from src.views.widgets.list_widget import ListWidget
+from src.views.widgets.search_bar import SearchBar
 from styles.futuristic_theme import get_theme
 from styles.panel_styles import PanelStyles
-from utils.panel_resizer import PanelResizer
-from core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
+from src.utils.panel_resizer import PanelResizer
+from src.core.taskbar_minimizable_mixin import TaskbarMinimizableMixin
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -510,7 +510,7 @@ class ProcessFloatingPanel(QWidget, TaskbarMinimizableMixin):
                     content = item_dict.get('content', '')
 
                     # Import component widgets
-                    from views.widgets.component_widgets import create_component_widget
+                    from src.views.widgets.component_widgets import create_component_widget
 
                     # Create component widget
                     component_widget = create_component_widget(
@@ -688,7 +688,7 @@ class ProcessFloatingPanel(QWidget, TaskbarMinimizableMixin):
         logger.info(f"Edit requested for item: {item.label}")
 
         try:
-            from views.item_editor_dialog import ItemEditorDialog
+            from src.views.item_editor_dialog import ItemEditorDialog
             from PyQt6.QtWidgets import QDialog
 
             # Create a simple controller wrapper that has config_manager
@@ -835,7 +835,7 @@ class ProcessFloatingPanel(QWidget, TaskbarMinimizableMixin):
             logger.info(f"Editing process: {self.current_process.name}")
 
             # Import ProcessBuilderWindow
-            from views.process_builder_window import ProcessBuilderWindow
+            from src.views.process_builder_window import ProcessBuilderWindow
 
             # Create and show edit window (pass process_id, not process object)
             edit_window = ProcessBuilderWindow(

@@ -14,8 +14,8 @@ import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.dialogs.tag_groups_dialog import TagGroupsDialog
-from views.dialogs.smart_collections_dialog import SmartCollectionsDialog
+from src.views.dialogs.tag_groups_dialog import TagGroupsDialog
+from src.views.dialogs.smart_collections_dialog import SmartCollectionsDialog
 
 logger = logging.getLogger(__name__)
 

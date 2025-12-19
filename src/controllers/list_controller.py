@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from database.db_manager import DBManager
-from core.clipboard_manager import ClipboardManager
+from src.database.db_manager import DBManager
+from src.core.clipboard_manager import ClipboardManager
 
 logger = logging.getLogger(__name__)
 

@@ -17,7 +17,7 @@ from PyQt6.QtGui import QFont
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.table_exporter import TableExporter
+from src.core.table_exporter import TableExporter
 
 logger = logging.getLogger(__name__)
 

@@ -15,14 +15,14 @@ import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.category_editor import CategoryEditor
-from views.appearance_settings import AppearanceSettings
-from views.hotkey_settings import HotkeySettings
-from views.general_settings import GeneralSettings
-from views.browser_settings import BrowserSettings
-from views.organization_settings import OrganizationSettings
-from views.files_settings import FilesSettings
-from views.screenshot_settings import ScreenshotSettings
+from src.views.category_editor import CategoryEditor
+from src.views.appearance_settings import AppearanceSettings
+from src.views.hotkey_settings import HotkeySettings
+from src.views.general_settings import GeneralSettings
+from src.views.browser_settings import BrowserSettings
+from src.views.organization_settings import OrganizationSettings
+from src.views.files_settings import FilesSettings
+from src.views.screenshot_settings import ScreenshotSettings
 
 # Get logger
 logger = logging.getLogger(__name__)

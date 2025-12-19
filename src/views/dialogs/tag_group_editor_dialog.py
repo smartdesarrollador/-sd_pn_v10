@@ -13,7 +13,7 @@ from pathlib import Path
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.tag_groups_manager import TagGroupsManager
+from src.core.tag_groups_manager import TagGroupsManager
 
 logger = logging.getLogger(__name__)
 

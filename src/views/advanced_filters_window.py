@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from views.widgets.advanced_filter_panel import AdvancedFilterPanel
+from src.views.widgets.advanced_filter_panel import AdvancedFilterPanel
 
 
 class AdvancedFiltersWindow(QWidget):

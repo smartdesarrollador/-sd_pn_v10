@@ -20,8 +20,8 @@ from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 # Add parent directories to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.process import Process, ProcessStep
-from database.db_manager import DBManager
+from src.models.process import Process, ProcessStep
+from src.database.db_manager import DBManager
 
 logger = logging.getLogger(__name__)
 

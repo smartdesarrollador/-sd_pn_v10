@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models.item import Item
+from src.models.item import Item
 
 
 class ClipboardHistory:

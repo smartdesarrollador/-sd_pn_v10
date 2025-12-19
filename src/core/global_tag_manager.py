@@ -5,7 +5,7 @@ Adapts the global tags table (managed by DBManager) to the interface expected by
 
 import logging
 from typing import List, Optional, Dict, Any
-from models.project_element_tag import ProjectElementTag
+from src.models.project_element_tag import ProjectElementTag
 
 logger = logging.getLogger(__name__)
 

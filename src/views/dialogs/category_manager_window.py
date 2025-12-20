@@ -510,6 +510,31 @@ class CategoryManagerWindow(QWidget, TaskbarMinimizableMixin):
         self.status_filter_combo.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         second_row_layout.addWidget(self.status_filter_combo)
 
+        # Refresh button
+        self.refresh_btn = QPushButton("🔄")
+        self.refresh_btn.setFixedSize(35, 35)
+        self.refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2d2d2d;
+                color: #cccccc;
+                border: 1px solid #3d3d3d;
+                border-radius: 6px;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #007acc;
+                border-color: #007acc;
+                color: #ffffff;
+            }
+            QPushButton:pressed {
+                background-color: #005a9e;
+            }
+        """)
+        self.refresh_btn.clicked.connect(self._on_refresh_categories)
+        self.refresh_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.refresh_btn.setToolTip("Refrescar lista de categorías")
+        second_row_layout.addWidget(self.refresh_btn)
+
         # Spacer
         second_row_layout.addStretch()
 
@@ -790,6 +815,32 @@ class CategoryManagerWindow(QWidget, TaskbarMinimizableMixin):
         """Handle status filter changes"""
         # Re-run search with new status filter
         self._perform_search()
+
+    def _on_refresh_categories(self):
+        """Handle refresh button click to reload categories"""
+        try:
+            logger.info("Refreshing categories list")
+
+            # Reload categories from database
+            self.load_categories()
+
+            # Show visual feedback
+            # Temporarily change button style to show it was clicked
+            original_text = self.refresh_btn.text()
+            self.refresh_btn.setText("✓")
+
+            # Reset button after 500ms
+            QTimer.singleShot(500, lambda: self.refresh_btn.setText(original_text))
+
+            logger.info(f"Categories refreshed: {len(self.all_categories)} total")
+
+        except Exception as e:
+            logger.error(f"Error refreshing categories: {e}")
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"No se pudieron refrescar las categorías:\n{str(e)}"
+            )
 
     def _perform_search(self):
         """Perform the search and update the list"""

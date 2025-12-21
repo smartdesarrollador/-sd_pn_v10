@@ -691,6 +691,7 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
             )
             item_button.item_clicked.connect(self.on_item_clicked)
             item_button.url_open_requested.connect(self.on_url_open_requested)
+            item_button.web_static_render_requested.connect(self.on_web_static_render_requested)
             item_button.item_edit_requested.connect(self.on_item_edit_requested)
             self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
 
@@ -745,6 +746,29 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
         logger.info(f"URL open requested: {url}")
         # Forward signal to parent (MainWindow)
         self.url_open_requested.emit(url)
+
+    def on_web_static_render_requested(self, item: Item):
+        """Handle WEB_STATIC render request from ItemButton"""
+        logger.info(f"WEB_STATIC render requested for item: {item.label}")
+
+        try:
+            from src.views.dialogs.embedded_browser_dialog import EmbeddedBrowserDialog
+
+            # Create and show dialog with HTML content
+            dialog = EmbeddedBrowserDialog(html_content=item.content, parent=self)
+            dialog.setWindowTitle(f"🌐 {item.label}")
+            dialog.show()  # Use show() instead of exec() for non-modal dialog
+
+            logger.info(f"WEB_STATIC dialog opened successfully for item: {item.label}")
+
+        except Exception as e:
+            logger.error(f"Error opening WEB_STATIC renderer for {item.label}: {e}", exc_info=True)
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al renderizar aplicación web estática:\n\n{str(e)}"
+            )
 
     def on_item_edit_requested(self, item):
         """Handle item edit request from ItemButton"""

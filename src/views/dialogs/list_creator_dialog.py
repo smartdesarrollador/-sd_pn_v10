@@ -18,8 +18,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.views.widgets.step_item_widget import StepItemWidget
-from src.views.widgets.tag_group_selector import TagGroupSelector
+from src.views.widgets.project_tag_selector import ProjectTagSelector
 from src.controllers.list_controller import ListController
+from src.core.global_tag_manager import GlobalTagManager
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class ListCreatorDialog(QDialog):
         Args:
             list_controller: Controlador de listas
             categories: Lista de categorías disponibles
-            db_path: Path a la base de datos para TagGroupSelector
+            db_path: Path a la base de datos para ProjectTagSelector
             selected_category_id: ID de categoría preseleccionada
             parent: Widget padre
         """
@@ -61,6 +62,11 @@ class ListCreatorDialog(QDialog):
         self.selected_category_id = selected_category_id
 
         self.step_widgets: List[StepItemWidget] = []
+
+        # Initialize GlobalTagManager from list_controller's db
+        self.global_tag_manager = None
+        if hasattr(list_controller, 'db') and list_controller.db:
+            self.global_tag_manager = GlobalTagManager(list_controller.db)
 
         self.setWindowTitle("📝 Crear Lista de Pasos")
         self.setModal(True)
@@ -166,54 +172,17 @@ class ListCreatorDialog(QDialog):
         tags_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         form_layout.addWidget(tags_label)
 
-        self.common_tags_input = QLineEdit()
-        self.common_tags_input.setPlaceholderText("Ej: python, git, produccion...")
-        form_layout.addWidget(self.common_tags_input)
-
-        # Tag Group Selector (optional) - wrapped in scroll area
-        if self.db_path:
-            try:
-                self.tag_group_selector = TagGroupSelector(self.db_path, self)
-                self.tag_group_selector.tags_changed.connect(self.on_tag_group_changed)
-
-                # Create scroll area for tag group selector
-                tags_scroll_area = QScrollArea()
-                tags_scroll_area.setWidget(self.tag_group_selector)
-                tags_scroll_area.setWidgetResizable(True)
-                tags_scroll_area.setFixedHeight(120)  # Fixed height with scroll
-                tags_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-                tags_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-                tags_scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
-                tags_scroll_area.setStyleSheet("""
-                    QScrollArea {
-                        border: 1px solid #3d3d3d;
-                        border-radius: 4px;
-                        background-color: #2d2d2d;
-                    }
-                    QScrollBar:vertical {
-                        background-color: #2d2d2d;
-                        width: 12px;
-                        border-radius: 6px;
-                    }
-                    QScrollBar::handle:vertical {
-                        background-color: #5a5a5a;
-                        border-radius: 6px;
-                        min-height: 20px;
-                    }
-                    QScrollBar::handle:vertical:hover {
-                        background-color: #007acc;
-                    }
-                    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                        height: 0px;
-                    }
-                """)
-
-                form_layout.addWidget(tags_scroll_area)
-            except Exception as e:
-                logger.warning(f"Could not initialize TagGroupSelector: {e}")
-                self.tag_group_selector = None
+        # ProjectTagSelector
+        if self.global_tag_manager:
+            self.tag_selector = ProjectTagSelector(self.global_tag_manager)
+            self.tag_selector.setMinimumHeight(150)
+            form_layout.addWidget(self.tag_selector)
         else:
-            self.tag_group_selector = None
+            # Fallback si no hay manager
+            self.tag_selector = None
+            self.common_tags_input = QLineEdit()
+            self.common_tags_input.setPlaceholderText("Ej: python, git, produccion...")
+            form_layout.addWidget(self.common_tags_input)
 
         # === SEPARADOR ===
         separator_label = QLabel("──────── Pasos del Proceso ────────")
@@ -531,18 +500,6 @@ class ListCreatorDialog(QDialog):
 
         return True, ""
 
-    def on_tag_group_changed(self, tags: list):
-        """Handle tag group selector changes"""
-        try:
-            # Actualizar el campo de tags comunes con los tags seleccionados
-            if tags:
-                self.common_tags_input.setText(", ".join(tags))
-            else:
-                self.common_tags_input.setText("")
-            logger.debug(f"Common tags updated from tag group selector: {tags}")
-        except Exception as e:
-            logger.error(f"Error updating common tags from tag group selector: {e}")
-
     def get_steps_data(self) -> List[dict]:
         """
         Obtiene los datos de todos los pasos y les agrega los tags comunes
@@ -552,14 +509,22 @@ class ListCreatorDialog(QDialog):
         Returns:
             Lista de diccionarios con datos de cada paso
         """
-        # Obtener tags comunes del input
-        common_tags_str = self.common_tags_input.text().strip()
-
-        # Convertir tags comunes de string a lista
+        # Obtener tags comunes del selector
         common_tags_list = []
-        if common_tags_str:
-            # Parsear tags separados por coma
-            common_tags_list = [tag.strip() for tag in common_tags_str.split(',') if tag.strip()]
+
+        if self.tag_selector:
+            # Usar ProjectTagSelector
+            selected_ids = self.tag_selector.get_selected_tags()
+            for tag_id in selected_ids:
+                tag = self.global_tag_manager.get_tag(tag_id)
+                if tag:
+                    common_tags_list.append(tag.name)
+        elif hasattr(self, 'common_tags_input'):
+            # Fallback: usar campo de texto
+            common_tags_str = self.common_tags_input.text().strip()
+            if common_tags_str:
+                # Parsear tags separados por coma
+                common_tags_list = [tag.strip() for tag in common_tags_str.split(',') if tag.strip()]
 
         # Obtener nombre de la lista para agregar como tag
         list_name = self.name_input.text().strip()

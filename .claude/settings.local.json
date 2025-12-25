@@ -76,7 +76,8 @@
       "Bash(grep:*)",
       "Bash(test:*)",
       "Bash(./venv/Scripts/python.exe -m pip:*)",
-      "Bash(./venv/Scripts/python.exe:*)"
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

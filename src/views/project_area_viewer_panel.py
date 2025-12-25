@@ -226,6 +226,30 @@ class ProjectAreaViewerPanel(QWidget):
 
         layout.addStretch()
 
+        # Botón actualizar/refrescar
+        self.refresh_btn = QPushButton("🔄")
+        self.refresh_btn.setFixedSize(20, 20)
+        self.refresh_btn.setToolTip("Actualizar datos")
+        self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_btn.clicked.connect(self._on_refresh_clicked)
+        self.refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2d5d2e;
+                color: #00ff88;
+                border: none;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #3a7a3c;
+            }
+            QPushButton:pressed {
+                background-color: #1a4d2e;
+            }
+        """)
+        layout.addWidget(self.refresh_btn)
+
         # Botón minimizar
         minimize_btn = QPushButton("−")
         minimize_btn.setFixedSize(20, 20)
@@ -850,6 +874,45 @@ class ProjectAreaViewerPanel(QWidget):
         """
         self.hide_search()
         logger.debug("Búsqueda cerrada por usuario")
+
+    def _on_refresh_clicked(self):
+        """
+        Callback cuando se hace click en el botón "Actualizar"
+
+        Refresca todos los datos:
+        1. Recarga lista de proyectos y áreas en dropdowns
+        2. Si hay proyecto/área seleccionado, recarga sus datos y tags
+        3. Re-renderiza la vista
+        """
+        logger.info("🔄 Actualizando datos del visor...")
+
+        try:
+            # 1. Recargar lista de proyectos y áreas disponibles
+            self._load_available_data()
+
+            # 2. Refrescar contenido actual si hay algo seleccionado
+            if self.current_project_id:
+                # Recargar tags del proyecto
+                self._load_project_tags(self.current_project_id)
+                # Recargar datos y re-renderizar
+                self.load_project(self.current_project_id)
+                logger.info(f"✅ Proyecto {self.current_project_id} actualizado")
+
+            elif self.current_area_id:
+                # Recargar tags del área
+                self._load_area_tags(self.current_area_id)
+                # Recargar datos y re-renderizar
+                self.load_area(self.current_area_id)
+                logger.info(f"✅ Área {self.current_area_id} actualizada")
+
+            else:
+                # No hay nada seleccionado, solo se actualizaron los dropdowns
+                logger.info("✅ Dropdowns actualizados (no hay proyecto/área seleccionado)")
+
+            logger.info("🔄 Actualización completada")
+
+        except Exception as e:
+            logger.error(f"❌ Error al actualizar datos: {e}", exc_info=True)
 
     # === DRAGGING DE VENTANA ===
 

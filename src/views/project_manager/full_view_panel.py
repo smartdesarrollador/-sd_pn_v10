@@ -81,8 +81,8 @@ class ProjectFullViewPanel(QWidget):
         # Header con botón de colapsar todo y búsqueda
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(15, 10, 15, 10)
-        header_layout.setSpacing(10)
+        header_layout.setContentsMargins(10, 5, 10, 5)
+        header_layout.setSpacing(6)
 
         # Botón de colapsar/expandir todo
         self.toggle_all_btn = QPushButton("Colapsar Todo")
@@ -275,7 +275,7 @@ class ProjectFullViewPanel(QWidget):
         tag_container = QWidget()
         tag_container_layout = QVBoxLayout(tag_container)
         tag_container_layout.setContentsMargins(0, 0, 0, 0)
-        tag_container_layout.setSpacing(8)
+        tag_container_layout.setSpacing(4)
 
         # Grupos de items
         for group in tag_data['groups']:
@@ -316,7 +316,7 @@ class ProjectFullViewPanel(QWidget):
         tag_container = QWidget()
         tag_container_layout = QVBoxLayout(tag_container)
         tag_container_layout.setContentsMargins(0, 0, 0, 0)
-        tag_container_layout.setSpacing(8)
+        tag_container_layout.setSpacing(4)
 
         # Grupo de items
         group_widget = ItemGroupWidget("Sin clasificar", "other")

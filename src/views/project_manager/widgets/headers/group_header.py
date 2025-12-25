@@ -38,8 +38,8 @@ class GroupHeaderWidget(QFrame):
     def init_ui(self):
         """Inicializar interfaz de usuario"""
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(40, 10, 15, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(30, 5, 10, 5)
+        layout.setSpacing(6)
 
         # Título del grupo
         self.title_label = QLabel()

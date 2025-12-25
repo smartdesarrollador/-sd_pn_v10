@@ -8,7 +8,7 @@ Autor: Widget Sidebar Team
 Versión: 1.0
 """
 
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QMenu
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QMenu, QScrollArea, QWidget
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QCursor
 from abc import abstractmethod
@@ -60,19 +60,61 @@ class BaseItemWidget(QFrame):
         self.setMinimumWidth(400)
         self.setMaximumWidth(16777215)  # Sin límite máximo (QWIDGETSIZE_MAX)
 
-        # Política de tamaño: expandir horizontalmente, tamaño fijo verticalmente
+        # IMPORTANTE: Limitar altura máxima para evitar que crezca demasiado
+        self.setMaximumHeight(300)  # Altura máxima de 300px
+
+        # Política de tamaño: expandir horizontalmente, máximo verticalmente
         from PyQt6.QtWidgets import QSizePolicy
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
 
         # Layout principal (horizontal)
         self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(12, 12, 12, 12)
-        self.main_layout.setSpacing(10)
+        self.main_layout.setContentsMargins(8, 6, 8, 6)
+        self.main_layout.setSpacing(6)
 
-        # Layout de contenido (vertical, izquierda)
-        self.content_layout = QVBoxLayout()
-        self.content_layout.setSpacing(6)
-        self.main_layout.addLayout(self.content_layout, 1)  # stretch=1 para ocupar espacio disponible
+        # Scroll area para el contenido (permite scroll vertical interno)
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.content_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.content_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.content_scroll.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #2d2d2d;
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: #555555;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #00ff88;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+
+        # Widget contenedor del contenido (dentro del scroll)
+        self.content_container = QWidget()
+        self.content_container.setStyleSheet("background: transparent;")
+
+        # Layout de contenido (vertical, dentro del contenedor)
+        self.content_layout = QVBoxLayout(self.content_container)
+        self.content_layout.setSpacing(4)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Establecer el contenedor en el scroll area
+        self.content_scroll.setWidget(self.content_container)
+
+        # Agregar scroll area al layout principal
+        self.main_layout.addWidget(self.content_scroll, 1)  # stretch=1 para ocupar espacio disponible
 
         # Contenedor de botones de acción (derecha)
         self.buttons_layout = QHBoxLayout()
@@ -443,6 +485,10 @@ class BaseItemWidget(QFrame):
 
         # Volver a renderizar el contenido
         self.render_content()
+
+        # Asegurar que el scroll se actualice correctamente
+        self.content_container.adjustSize()
+        self.content_scroll.updateGeometry()
 
     def _edit_item(self):
         """Editar el item"""

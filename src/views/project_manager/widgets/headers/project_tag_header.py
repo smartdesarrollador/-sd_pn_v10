@@ -46,8 +46,8 @@ class ProjectTagHeaderWidget(QFrame):
     def init_ui(self):
         """Inicializar interfaz de usuario"""
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 15, 15, 15)
-        layout.setSpacing(12)
+        layout.setContentsMargins(15, 6, 10, 6)
+        layout.setSpacing(8)
 
         # Botón de colapso
         self.collapse_btn = QPushButton("▼")

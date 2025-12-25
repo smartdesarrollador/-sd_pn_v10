@@ -39,8 +39,8 @@ class ProjectHeaderWidget(QFrame):
     def init_ui(self):
         """Inicializar interfaz de usuario"""
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(15, 20, 15, 20)
-        layout.setSpacing(12)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(8)
 
         # Icono del proyecto
         self.icon_label = QLabel(self.project_icon)

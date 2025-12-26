@@ -500,7 +500,10 @@ Python fue creado por Guido van Rossum y lanzado por primera vez en 1991. El nom
                 'content': item.get('content', ''),
                 'type': item.get('type', 'TEXT'),
                 'description': item.get('description', ''),
-                'is_sensitive': item.get('is_sensitive', False)
+                'is_sensitive': item.get('is_sensitive', False),
+                'list_id': item.get('list_id'),  # ← NECESARIO para ordenamiento
+                'orden_lista': item.get('orden_lista'),  # ← NECESARIO para ordenamiento
+                'tags': item.get('tags', [])  # ← Incluir tags también
             })
 
         return formatted_items

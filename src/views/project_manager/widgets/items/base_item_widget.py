@@ -395,8 +395,72 @@ class BaseItemWidget(QFrame):
         """
         Crear botones de acción específicos del tipo de item
 
-        ✨ NUEVO DISEÑO: Botones con fondo gris oscuro, naranja y azul
+        ✨ NUEVO DISEÑO: Botones de ordenamiento + editar + copiar
         """
+        # Botón mover arriba (gris con flecha ▲)
+        self.move_up_button = QPushButton("▲")
+        self.move_up_button.setFixedSize(32, 24)
+        self.move_up_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.move_up_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4d4d4d;
+                color: #ff5555;
+                border: 1px solid #555;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px;
+            }
+            QPushButton:hover {
+                background-color: #5d5d5d;
+                border-color: #ff5555;
+                color: #ff7777;
+            }
+            QPushButton:pressed {
+                background-color: #3d3d3d;
+            }
+            QPushButton:disabled {
+                background-color: #2d2d2d;
+                color: #555;
+                border-color: #444;
+            }
+        """)
+        self.move_up_button.setToolTip("Mover item hacia arriba")
+        self.move_up_button.clicked.connect(self._move_item_up)
+        self.buttons_layout.addWidget(self.move_up_button)
+
+        # Botón mover abajo (gris con flecha ▼)
+        self.move_down_button = QPushButton("▼")
+        self.move_down_button.setFixedSize(32, 24)
+        self.move_down_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.move_down_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4d4d4d;
+                color: #ff5555;
+                border: 1px solid #555;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px;
+            }
+            QPushButton:hover {
+                background-color: #5d5d5d;
+                border-color: #ff5555;
+                color: #ff7777;
+            }
+            QPushButton:pressed {
+                background-color: #3d3d3d;
+            }
+            QPushButton:disabled {
+                background-color: #2d2d2d;
+                color: #555;
+                border-color: #444;
+            }
+        """)
+        self.move_down_button.setToolTip("Mover item hacia abajo")
+        self.move_down_button.clicked.connect(self._move_item_down)
+        self.buttons_layout.addWidget(self.move_down_button)
+
         # Botón de editar (naranja/ámbar)
         self.edit_button = QPushButton("🖊️")
         self.edit_button.setFixedSize(32, 24)
@@ -807,3 +871,151 @@ class BaseItemWidget(QFrame):
         Busca el AreaFullViewPanel padre y recarga la vista.
         """
         self._reload_view()
+
+    def _move_item_up(self):
+        """
+        Mover item hacia arriba en la lista
+
+        Intercambia el orden_lista con el item anterior en la misma lista.
+        """
+        try:
+            # Obtener db_manager
+            db_manager = self._get_db_manager()
+            if not db_manager:
+                logger.error("No se pudo obtener db_manager para reordenar")
+                return
+
+            # Obtener datos del item actual
+            item_id = self.item_data.get('id')
+            list_id = self.item_data.get('list_id')
+            current_order = self.item_data.get('orden_lista')
+
+            # DEBUG: Ver qué campos tiene item_data
+            logger.debug(f"🔍 item_data keys: {list(self.item_data.keys())}")
+            logger.debug(f"🔍 item_id={item_id}, list_id={list_id}, orden_lista={current_order}")
+
+            if not list_id:
+                logger.warning(f"Item {item_id} no pertenece a una lista, no se puede reordenar")
+                return
+
+            logger.info(f"⬆️ Moviendo item {item_id} hacia arriba (orden actual: {current_order})")
+
+            # Obtener todos los items de la misma lista ordenados
+            query = """
+                SELECT id, orden_lista
+                FROM items
+                WHERE list_id = ?
+                ORDER BY CAST(orden_lista AS INTEGER) ASC
+            """
+            items = db_manager.execute_query(query, (list_id,))
+
+            if not items or len(items) < 2:
+                logger.debug("No hay suficientes items para reordenar")
+                return
+
+            # Encontrar posición actual y anterior
+            current_index = None
+            for i, item in enumerate(items):
+                if item['id'] == item_id:
+                    current_index = i
+                    break
+
+            if current_index is None or current_index == 0:
+                logger.debug("Item ya está en la primera posición")
+                return
+
+            # Intercambiar con el item anterior
+            prev_item = items[current_index - 1]
+            current_item = items[current_index]
+
+            logger.debug(f"Intercambiando orden: Item {prev_item['id']} (orden {prev_item['orden_lista']}) ↔ Item {current_item['id']} (orden {current_item['orden_lista']})")
+
+            # Actualizar orden en BD
+            db_manager.execute_update(
+                "UPDATE items SET orden_lista = ? WHERE id = ?",
+                (current_item['orden_lista'], prev_item['id'])
+            )
+            db_manager.execute_update(
+                "UPDATE items SET orden_lista = ? WHERE id = ?",
+                (prev_item['orden_lista'], current_item['id'])
+            )
+
+            logger.info(f"✅ Item {item_id} movido hacia arriba exitosamente")
+
+            # Recargar vista
+            self._reload_view()
+
+        except Exception as e:
+            logger.error(f"❌ Error moviendo item hacia arriba: {e}", exc_info=True)
+
+    def _move_item_down(self):
+        """
+        Mover item hacia abajo en la lista
+
+        Intercambia el orden_lista con el item siguiente en la misma lista.
+        """
+        try:
+            # Obtener db_manager
+            db_manager = self._get_db_manager()
+            if not db_manager:
+                logger.error("No se pudo obtener db_manager para reordenar")
+                return
+
+            # Obtener datos del item actual
+            item_id = self.item_data.get('id')
+            list_id = self.item_data.get('list_id')
+            current_order = self.item_data.get('orden_lista')
+
+            if not list_id:
+                logger.warning(f"Item {item_id} no pertenece a una lista, no se puede reordenar")
+                return
+
+            logger.info(f"⬇️ Moviendo item {item_id} hacia abajo (orden actual: {current_order})")
+
+            # Obtener todos los items de la misma lista ordenados
+            query = """
+                SELECT id, orden_lista
+                FROM items
+                WHERE list_id = ?
+                ORDER BY CAST(orden_lista AS INTEGER) ASC
+            """
+            items = db_manager.execute_query(query, (list_id,))
+
+            if not items or len(items) < 2:
+                logger.debug("No hay suficientes items para reordenar")
+                return
+
+            # Encontrar posición actual y siguiente
+            current_index = None
+            for i, item in enumerate(items):
+                if item['id'] == item_id:
+                    current_index = i
+                    break
+
+            if current_index is None or current_index >= len(items) - 1:
+                logger.debug("Item ya está en la última posición")
+                return
+
+            # Intercambiar con el item siguiente
+            current_item = items[current_index]
+            next_item = items[current_index + 1]
+
+            logger.debug(f"Intercambiando orden: Item {current_item['id']} (orden {current_item['orden_lista']}) ↔ Item {next_item['id']} (orden {next_item['orden_lista']})")
+
+            # Actualizar orden en BD
+            db_manager.execute_update(
+                "UPDATE items SET orden_lista = ? WHERE id = ?",
+                (next_item['orden_lista'], current_item['id'])
+            )
+            db_manager.execute_update(
+                "UPDATE items SET orden_lista = ? WHERE id = ?",
+                (current_item['orden_lista'], next_item['id'])
+            )
+
+            logger.info(f"✅ Item {item_id} movido hacia abajo exitosamente")
+
+            # Recargar vista
+            self._reload_view()
+
+        except Exception as e:
+            logger.error(f"❌ Error moviendo item hacia abajo: {e}", exc_info=True)

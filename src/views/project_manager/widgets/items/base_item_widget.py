@@ -395,8 +395,33 @@ class BaseItemWidget(QFrame):
         """
         Crear botones de acción específicos del tipo de item
 
-        ✨ NUEVO DISEÑO: Botones con fondo gris oscuro y azul
+        ✨ NUEVO DISEÑO: Botones con fondo gris oscuro, naranja y azul
         """
+        # Botón de editar (naranja/ámbar)
+        self.edit_button = QPushButton("🖊️")
+        self.edit_button.setFixedSize(32, 24)
+        self.edit_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.edit_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: #ffffff;
+                border: 1px solid #F57C00;
+                border-radius: 4px;
+                font-size: 14px;
+                padding: 2px;
+            }
+            QPushButton:hover {
+                background-color: #FB8C00;
+                border-color: #E65100;
+            }
+            QPushButton:pressed {
+                background-color: #E65100;
+            }
+        """)
+        self.edit_button.setToolTip("Editar item")
+        self.edit_button.clicked.connect(self._edit_item)
+        self.buttons_layout.addWidget(self.edit_button)
+
         # Botón de copiar (gris oscuro)
         self.copy_button = QPushButton("📋")
         self.copy_button.setFixedSize(32, 24)
@@ -517,7 +542,7 @@ class BaseItemWidget(QFrame):
         self.content_scroll.updateGeometry()
 
     def _edit_item(self):
-        """Editar el item"""
+        """Editar el item usando el nuevo EditItemDialog"""
         # Si el item es sensible, verificar contraseña maestra
         if self.item_data.get('is_sensitive', False):
             from src.views.dialogs.master_password_dialog import MasterPasswordDialog
@@ -533,25 +558,29 @@ class BaseItemWidget(QFrame):
                 logger.info(f"Master password verification cancelled for editing item: {item_label}")
                 return
 
-        # Abrir diálogo de edición
-        from src.views.item_editor_dialog import ItemEditorDialog
-        from src.models.item import Item
+        # Abrir nuevo diálogo de edición
+        from src.views.dialogs.edit_item_dialog import EditItemDialog
 
         try:
-            # Convertir dict a objeto Item
-            item = Item.from_dict(self.item_data)
+            # Obtener db_manager desde el padre (visor o área completa)
+            db_manager = self._get_db_manager()
 
-            # Crear diálogo de edición
-            dialog = ItemEditorDialog(item=item, parent=self.window())
+            if not db_manager:
+                logger.error("No se pudo obtener db_manager para editar item")
+                return
+
+            # Crear y mostrar diálogo de edición
+            dialog = EditItemDialog(item_data=self.item_data, db_manager=db_manager, parent=self.window())
+            dialog.item_updated.connect(self._on_item_updated)
             result = dialog.exec()
 
             if result:
-                logger.info(f"Item edited: {item.label}")
-                # Recargar la vista del área
-                self._reload_area_view()
+                logger.info(f"Item {self.item_data.get('id')} editado exitosamente")
+                # Recargar la vista
+                self._reload_view()
 
         except Exception as e:
-            logger.error(f"Error editing item: {e}")
+            logger.error(f"Error editing item: {e}", exc_info=True)
 
     def _show_details(self):
         """Mostrar detalles del item"""
@@ -685,18 +714,81 @@ class BaseItemWidget(QFrame):
 
         super().mouseReleaseEvent(event)
 
-    def _reload_area_view(self):
+    def _get_db_manager(self):
         """
-        Recargar la vista del área completa
+        Obtener db_manager desde el widget padre
 
-        Busca el AreaFullViewPanel padre y recarga la vista.
+        Busca en la jerarquía de widgets hasta encontrar uno que tenga 'db' o 'db_manager'.
+
+        Returns:
+            DBManager o None si no se encuentra
         """
-        from src.views.area_manager.area_full_view_panel import AreaFullViewPanel
+        # Buscar el db_manager en la jerarquía de padres
+        parent_widget = self.parent()
+        while parent_widget:
+            # Intentar obtener db_manager o db
+            if hasattr(parent_widget, 'db'):
+                return parent_widget.db
+            if hasattr(parent_widget, 'db_manager'):
+                return parent_widget.db_manager
+
+            parent_widget = parent_widget.parent()
+
+        logger.warning("No se pudo encontrar db_manager en la jerarquía de widgets")
+        return None
+
+    def _on_item_updated(self, updated_item_data: dict):
+        """
+        Callback cuando se actualiza el item
+
+        Args:
+            updated_item_data: Datos actualizados del item
+        """
+        # Actualizar datos locales
+        self.item_data.update(updated_item_data)
+        logger.info(f"Item {self.item_data.get('id')} actualizado en widget")
+
+        # Re-renderizar contenido con los nuevos datos
+        self._update_content_visibility()
+
+    def _reload_view(self):
+        """
+        Recargar la vista completa del panel padre
+
+        Busca el ProjectAreaViewerPanel o AreaFullViewPanel padre y recarga.
+        """
+        from src.views.project_area_viewer_panel import ProjectAreaViewerPanel
 
         # Buscar el panel padre
         parent_widget = self.parent()
         while parent_widget:
-            if isinstance(parent_widget, AreaFullViewPanel):
-                parent_widget.refresh_view()
+            # ProjectAreaViewerPanel
+            if isinstance(parent_widget, ProjectAreaViewerPanel):
+                # Recargar proyecto o área actual
+                if hasattr(parent_widget, 'current_project_id') and parent_widget.current_project_id:
+                    parent_widget.load_project(parent_widget.current_project_id)
+                    logger.info(f"Vista de proyecto {parent_widget.current_project_id} recargada")
+                elif hasattr(parent_widget, 'current_area_id') and parent_widget.current_area_id:
+                    parent_widget.load_area(parent_widget.current_area_id)
+                    logger.info(f"Vista de área {parent_widget.current_area_id} recargada")
                 break
+
+            # AreaFullViewPanel (legacy)
+            try:
+                from src.views.area_manager.area_full_view_panel import AreaFullViewPanel
+                if isinstance(parent_widget, AreaFullViewPanel):
+                    parent_widget.refresh_view()
+                    logger.info("Vista de área completa recargada")
+                    break
+            except ImportError:
+                pass  # AreaFullViewPanel no existe
+
             parent_widget = parent_widget.parent()
+
+    def _reload_area_view(self):
+        """
+        Recargar la vista del área completa (legacy, llama a _reload_view)
+
+        Busca el AreaFullViewPanel padre y recarga la vista.
+        """
+        self._reload_view()

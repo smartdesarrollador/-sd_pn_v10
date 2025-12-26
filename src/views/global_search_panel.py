@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.item import Item, ItemType
 from src.views.widgets.item_widget import ItemButton
+from src.views.widgets.list_widget import ListWidget
 from src.views.widgets.search_bar import SearchBar
 from src.views.advanced_filters_window import AdvancedFiltersWindow
 from src.core.search_engine import SearchEngine
@@ -48,6 +49,7 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
         self.search_engine = SearchEngine()
         self.filter_engine = AdvancedFilterEngine()  # Motor de filtrado avanzado
         self.all_items = []  # Store all items before filtering
+        self.all_lists = []  # Store all lists before filtering
         self.current_filters = {}  # Filtros activos actuales
         self.current_state_filter = "normal"  # Filtro de estado actual: normal, archived, inactive, all
 
@@ -633,6 +635,29 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
 
         logger.info(f"Loaded {len(self.all_items)} items from database")
 
+        # Get all lists from all categories
+        self.all_lists = []
+        if self.list_controller and self.db_manager:
+            try:
+                # Get all categories (including inactive)
+                categories = self.db_manager.get_categories(include_inactive=True)
+
+                # Get lists from each category
+                for category in categories:
+                    category_id = category.get('id')
+                    if category_id:
+                        category_lists = self.list_controller.get_lists(category_id)
+                        # Add category info to each list
+                        for list_data in category_lists:
+                            list_data['category_id'] = category_id
+                            list_data['category_name'] = category.get('name', '')
+                            list_data['category_icon'] = category.get('icon', '')
+                        self.all_lists.extend(category_lists)
+
+                logger.info(f"Loaded {len(self.all_lists)} lists from all categories")
+            except Exception as e:
+                logger.error(f"Error loading lists: {e}", exc_info=True)
+
         # Update available tags in filters window
         self.filters_window.update_available_tags(self.all_items)
         logger.debug(f"Updated available tags from {len(self.all_items)} items")
@@ -640,11 +665,17 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
         # Clear search bar
         self.search_bar.clear_search()
 
-        # Display only first 100 items initially (for performance)
+        # Display only first 100 items+lists initially (for performance)
         # When user searches/filters, all matching items will be shown
         initial_display_limit = 100
         items_to_display = self.all_items[:initial_display_limit]
-        self.display_items(items_to_display, total_count=len(self.all_items))
+        total_count = len(self.all_items) + len(self.all_lists)
+
+        # If we have space, add some lists too
+        remaining_slots = initial_display_limit - len(items_to_display)
+        lists_to_display = self.all_lists[:remaining_slots] if remaining_slots > 0 else []
+
+        self.display_items_and_lists(items_to_display, lists_to_display, total_count=total_count)
 
         # Show the window
         self.show()
@@ -729,6 +760,176 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
 
         logger.info(f"Successfully added {len(items)} item buttons to layout")
 
+    def display_items_and_lists(self, items, lists, total_count=None):
+        """Display items and lists in separate sections
+
+        Args:
+            items: List of Item objects
+            lists: List of list metadata dicts from ListController.get_lists()
+            total_count: Total number of items+lists available (if showing limited results)
+        """
+        logger.info(f"Displaying {len(items)} items and {len(lists)} lists")
+
+        # Calculate total display count
+        display_count = len(items) + len(lists)
+
+        # Actualizar título con contador
+        if total_count and total_count > display_count:
+            # Showing limited results
+            self.header_label.setText(f"🌐 Búsqueda Global ({display_count} de {total_count} items)")
+        else:
+            # Showing all results
+            self.header_label.setText(f"🌐 Búsqueda Global ({display_count} items)")
+
+        # Clear existing items
+        self.clear_items()
+
+        # Límite de visualización
+        MAX_DISPLAY_ITEMS = 100
+        MAX_DISPLAY_LISTS = 100
+
+        # === SECCIÓN DE ITEMS ===
+        if items:
+            total_items = len(items)
+            items_to_display = items[:MAX_DISPLAY_ITEMS]  # Limitar a 100
+
+            # Section header con conteo
+            if total_items > MAX_DISPLAY_ITEMS:
+                items_header_text = f"━━━ Items ({MAX_DISPLAY_ITEMS} de {total_items}) ━━━"
+            else:
+                items_header_text = f"━━━ Items ({total_items}) ━━━"
+
+            items_header = QLabel(items_header_text)
+            items_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            items_header.setStyleSheet("""
+                QLabel {
+                    color: #888888;
+                    font-size: 10pt;
+                    font-weight: bold;
+                    padding: 8px;
+                    background-color: transparent;
+                }
+            """)
+            self.items_layout.insertWidget(self.items_layout.count() - 1, items_header)
+
+            # Add items (solo los primeros 100)
+            for idx, item in enumerate(items_to_display):
+                logger.debug(f"Creating item button {idx+1}/{len(items_to_display)}: {item.label}")
+
+                # Get display options from checkboxes
+                show_labels = self.show_labels_checkbox.isChecked()
+                show_tags = self.show_tags_checkbox.isChecked()
+                show_content = self.show_content_checkbox.isChecked()
+                show_description = self.show_description_checkbox.isChecked()
+
+                # Create ItemButton with display options
+                item_button = ItemButton(
+                    item,
+                    show_category=True,  # Show category in global search
+                    show_labels=show_labels,
+                    show_tags=show_tags,
+                    show_content=show_content,
+                    show_description=show_description
+                )
+                item_button.item_clicked.connect(self.on_item_clicked)
+                item_button.url_open_requested.connect(self.on_url_open_requested)
+                item_button.web_static_render_requested.connect(self.on_web_static_render_requested)
+                item_button.item_edit_requested.connect(self.on_item_edit_requested)
+                self.items_layout.insertWidget(self.items_layout.count() - 1, item_button)
+
+        # === SECCIÓN DE LISTAS ===
+        if lists:
+            total_lists = len(lists)
+            lists_to_display = lists[:MAX_DISPLAY_LISTS]  # Limitar a 100
+
+            # Spacer entre secciones
+            if items:
+                spacer_label = QLabel("")
+                spacer_label.setFixedHeight(10)
+                spacer_label.setStyleSheet("background-color: transparent;")
+                self.items_layout.insertWidget(self.items_layout.count() - 1, spacer_label)
+
+            # Section header con conteo
+            if total_lists > MAX_DISPLAY_LISTS:
+                lists_header_text = f"━━━ Listas ({MAX_DISPLAY_LISTS} de {total_lists}) ━━━"
+            else:
+                lists_header_text = f"━━━ Listas ({total_lists}) ━━━"
+
+            lists_header = QLabel(lists_header_text)
+            lists_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lists_header.setStyleSheet("""
+                QLabel {
+                    color: #888888;
+                    font-size: 10pt;
+                    font-weight: bold;
+                    padding: 8px;
+                    background-color: transparent;
+                }
+            """)
+            self.items_layout.insertWidget(self.items_layout.count() - 1, lists_header)
+
+            # Add lists (solo las primeras 100)
+            for idx, list_data in enumerate(lists_to_display):
+                lista_id = list_data.get('id', 0)
+                list_name = list_data.get('name', 'Sin nombre')
+                category_id = list_data.get('category_id', None)
+                logger.debug(f"Creating list widget {idx+1}/{len(lists_to_display)}: lista_id={lista_id}, name='{list_name}'")
+
+                # Obtener items de la lista
+                list_items = []
+                if self.list_controller:
+                    list_items = self.list_controller.get_list_items(lista_id)
+
+                # Crear ListWidget
+                list_widget = ListWidget(
+                    list_data=list_data,
+                    category_id=category_id,
+                    list_items=list_items
+                )
+
+                # Conectar señales
+                list_widget.list_executed.connect(self.on_list_executed)
+                list_widget.list_edited.connect(self.on_list_edit_requested)
+                list_widget.list_deleted.connect(self.on_list_delete_requested)
+                list_widget.copy_all_requested.connect(self.on_list_copy_all_requested)
+                list_widget.item_copied.connect(self.on_list_item_copied)
+
+                self.items_layout.insertWidget(self.items_layout.count() - 1, list_widget)
+
+        # Add info message if showing limited results
+        if total_count and total_count > display_count:
+            info_widget = QWidget()
+            info_widget.setStyleSheet("""
+                QWidget {
+                    background-color: #2d2d2d;
+                    border: 1px solid #4d4d4d;
+                    border-radius: 4px;
+                    padding: 10px;
+                    margin: 5px;
+                }
+            """)
+            info_layout = QVBoxLayout(info_widget)
+            info_layout.setContentsMargins(10, 10, 10, 10)
+
+            info_label = QLabel(
+                f"ℹ️ Mostrando los primeros {display_count} items/listas de {total_count} totales.\n"
+                f"💡 Usa la búsqueda o filtros para encontrar items específicos."
+            )
+            info_label.setWordWrap(True)
+            info_label.setStyleSheet("""
+                QLabel {
+                    color: #aaaaaa;
+                    font-size: 10pt;
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
+            info_layout.addWidget(info_label)
+
+            self.items_layout.insertWidget(self.items_layout.count() - 1, info_widget)
+
+        logger.info(f"Successfully displayed {len(items_to_display) if items else 0}/{len(items)} items and {len(lists_to_display) if lists else 0}/{len(lists)} lists")
+
     def clear_items(self):
         """Clear all item buttons"""
         while self.items_layout.count() > 1:  # Keep the stretch at the end
@@ -805,6 +1006,138 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Error", f"Error al abrir editor de item:\n\n{str(e)}")
 
+    # ========== LIST WIDGET HANDLERS ==========
+
+    def on_list_executed(self, lista_id: int, category_id: int):
+        """Handle list execution request from ListWidget"""
+        logger.info(f"Executing lista_id={lista_id} from category {category_id}")
+
+        if not self.list_controller:
+            logger.warning("No ListController available for execution")
+            return
+
+        try:
+            # Ejecutar lista secuencialmente con delay de 500ms
+            success = self.list_controller.execute_list_sequentially(
+                lista_id=lista_id,
+                delay_ms=500
+            )
+
+            if success:
+                logger.info(f"lista_id={lista_id} execution started successfully")
+            else:
+                logger.warning(f"Failed to start lista_id={lista_id} execution")
+
+        except Exception as e:
+            logger.error(f"Error executing lista_id={lista_id}: {e}", exc_info=True)
+
+    def on_list_edit_requested(self, lista_id: int, category_id: int):
+        """Handle list edit request from ListWidget"""
+        logger.info(f"Edit requested for lista_id={lista_id} from category {category_id}")
+
+        if not self.list_controller:
+            logger.error("No ListController available for editing")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "Error",
+                "ListController no disponible.\n\nPor favor reinicia la aplicación."
+            )
+            return
+
+        try:
+            from src.views.dialogs.list_editor_dialog import ListEditorDialog
+
+            # Obtener categorías para el editor
+            categories = []
+            if self.config_manager:
+                categories = self.config_manager.get_categories()
+                logger.info(f"Loaded {len(categories)} categories for editor dialog")
+
+            # Crear y mostrar dialog de edición
+            editor_dialog = ListEditorDialog(
+                list_controller=self.list_controller,
+                categories=categories,
+                category_id=category_id,
+                lista_id=lista_id,
+                parent=self
+            )
+
+            # Conectar señal de lista actualizada
+            editor_dialog.list_updated.connect(self.on_list_updated_from_dialog)
+
+            # Mostrar dialog
+            result = editor_dialog.exec()
+
+            logger.info(f"List editor dialog closed with result: {result}")
+
+        except Exception as e:
+            logger.error(f"Error opening list editor: {e}", exc_info=True)
+
+    def on_list_delete_requested(self, lista_id: int, category_id: int):
+        """Handle list deletion request from ListWidget"""
+        logger.info(f"Delete requested for lista_id={lista_id} from category {category_id}")
+
+        if not self.list_controller:
+            logger.warning("No ListController available for deletion")
+            return
+
+        try:
+            # Eliminar la lista
+            success, message = self.list_controller.delete_list(lista_id)
+
+            if success:
+                logger.info(f"lista_id={lista_id} deleted successfully")
+
+                # Recargar todas las listas
+                self.load_all_items()
+            else:
+                logger.warning(f"Failed to delete lista_id={lista_id}: {message}")
+
+        except Exception as e:
+            logger.error(f"Error deleting lista_id={lista_id}: {e}", exc_info=True)
+
+    def on_list_copy_all_requested(self, lista_id: int, category_id: int):
+        """Handle copy all request from ListWidget"""
+        logger.info(f"Copy all requested for lista_id={lista_id} from category {category_id}")
+
+        if not self.list_controller:
+            logger.error("No ListController available for copy operation")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "Error",
+                "ListController no disponible.\n\nPor favor reinicia la aplicación."
+            )
+            return
+
+        try:
+            # Copiar todo el contenido de la lista
+            success, message = self.list_controller.copy_all_list_items(
+                lista_id=lista_id,
+                separator='\n'
+            )
+
+            if success:
+                logger.info(f"All items from lista_id={lista_id} copied to clipboard")
+            else:
+                logger.warning(f"Failed to copy lista_id={lista_id}: {message}")
+
+        except Exception as e:
+            logger.error(f"Error copying lista_id={lista_id}: {e}", exc_info=True)
+
+    def on_list_item_copied(self, content: str):
+        """Handle individual list item copy"""
+        logger.info(f"List item copied: {content[:50]}...")
+        # El contenido ya fue copiado por el ListWidget, solo loguear
+
+    def on_list_updated_from_dialog(self, lista_id: int, category_id: int):
+        """Handle list update from ListEditorDialog"""
+        logger.info(f"lista_id={lista_id} updated successfully in category {category_id}")
+
+        # Recargar todas las listas
+        self.load_all_items()
+
     def on_item_state_changed(self, item_id: str):
         """Handle item state change (favorite/archived) from ItemDetailsDialog"""
         logger.info(f"Item {item_id} state changed, refreshing search results")
@@ -843,63 +1176,100 @@ class GlobalSearchPanel(QWidget, TaskbarMinimizableMixin):
         query = self.pending_search_query
         logger.debug(f"_perform_search called with query='{query}'")
         logger.debug(f"Total items before filter: {len(self.all_items)}")
+        logger.debug(f"Total lists before filter: {len(self.all_lists)}")
         logger.debug(f"Current filters: {self.current_filters}")
 
-        # Aplicar filtros avanzados primero
-        filtered_items = self.filter_engine.apply_filters(self.all_items, self.current_filters)
-        logger.debug(f"Items after advanced filters: {len(filtered_items)}")
+        # Verificar si el filtro "Solo Listas" está activo
+        only_lists = self.current_filters.get('is_list', False)
 
-        # Aplicar filtro de estado
-        filtered_items = self.filter_items_by_state(filtered_items)
-        logger.debug(f"Items after state filter: {len(filtered_items)}")
+        if only_lists:
+            # Si "Solo Listas" está activo, mostrar solo listas (ningún item)
+            filtered_items = []
+            filtered_lists = self.all_lists.copy()
+        else:
+            # Aplicar filtros avanzados primero a items
+            filtered_items = self.filter_engine.apply_filters(self.all_items, self.current_filters)
+            logger.debug(f"Items after advanced filters: {len(filtered_items)}")
+
+            # Aplicar filtro de estado
+            filtered_items = self.filter_items_by_state(filtered_items)
+            logger.debug(f"Items after state filter: {len(filtered_items)}")
+
+            # Copiar todas las listas
+            filtered_lists = self.all_lists.copy()
 
         # Luego aplicar búsqueda si hay query
         if query and query.strip():
-            # Search in labels, content, tags, description, and category name
-            search_results = []
             query_lower = query.lower()
 
-            for item in filtered_items:
-                # Search in label
-                if query_lower in item.label.lower():
-                    search_results.append(item)
-                    continue
+            # Buscar en items (solo si no está el filtro "Solo Listas")
+            if not only_lists:
+                # Search in labels, content, tags, description, and category name
+                search_results = []
 
-                # Search in content (if not sensitive)
-                if not item.is_sensitive and query_lower in item.content.lower():
-                    search_results.append(item)
-                    continue
-
-                # Search in tags
-                if any(query_lower in tag.lower() for tag in item.tags):
-                    search_results.append(item)
-                    continue
-
-                # Search in description
-                if item.description and query_lower in item.description.lower():
-                    search_results.append(item)
-                    continue
-
-                # Search in category name
-                if hasattr(item, 'category_name') and item.category_name:
-                    if query_lower in item.category_name.lower():
+                for item in filtered_items:
+                    # Search in label
+                    if query_lower in item.label.lower():
                         search_results.append(item)
                         continue
 
-            filtered_items = search_results
+                    # Search in content (if not sensitive)
+                    if not item.is_sensitive and query_lower in item.content.lower():
+                        search_results.append(item)
+                        continue
+
+                    # Search in tags
+                    if any(query_lower in tag.lower() for tag in item.tags):
+                        search_results.append(item)
+                        continue
+
+                    # Search in description
+                    if item.description and query_lower in item.description.lower():
+                        search_results.append(item)
+                        continue
+
+                    # Search in category name
+                    if hasattr(item, 'category_name') and item.category_name:
+                        if query_lower in item.category_name.lower():
+                            search_results.append(item)
+                            continue
+
+                filtered_items = search_results
+
+            # Buscar en nombres de listas y categorías
+            search_lists = []
+            for list_data in filtered_lists:
+                # Search in list name
+                if query_lower in list_data.get('name', '').lower():
+                    search_lists.append(list_data)
+                    continue
+
+                # Search in category name
+                if query_lower in list_data.get('category_name', '').lower():
+                    search_lists.append(list_data)
+                    continue
+
+            filtered_lists = search_lists
+
+        # Calculate total count
+        total_count = len(filtered_items) + len(filtered_lists)
 
         # Apply initial display limit if no search/filters are active
         # (for performance with large datasets)
         if not query.strip() and not self.current_filters and self.current_state_filter == 'normal':
-            # No search, no advanced filters, no state filter -> limit to 100 items
+            # No search, no advanced filters, no state filter -> limit to 100 items+lists
             initial_display_limit = 100
-            if len(filtered_items) > initial_display_limit:
-                self.display_items(filtered_items[:initial_display_limit], total_count=len(filtered_items))
+            items_to_show = filtered_items[:initial_display_limit]
+            remaining_slots = initial_display_limit - len(items_to_show)
+            lists_to_show = filtered_lists[:remaining_slots] if remaining_slots > 0 else []
+
+            if total_count > initial_display_limit:
+                self.display_items_and_lists(items_to_show, lists_to_show, total_count=total_count)
             else:
-                self.display_items(filtered_items)
+                self.display_items_and_lists(items_to_show, lists_to_show)
         else:
             # Search or filters active -> show all results
-            self.display_items(filtered_items)
+            self.display_items_and_lists(filtered_items, filtered_lists)
 
         # Update filter badge when search changes
         self.update_filter_badge()

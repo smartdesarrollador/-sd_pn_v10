@@ -154,7 +154,7 @@ class AdvancedFiltersWindow(QWidget):
 
     def mouseMoveEvent(self, event):
         """Handle mouse move para arrastrar la ventana"""
-        if event.buttons() == Qt.MouseButton.LeftButton:
+        if event.buttons() == Qt.MouseButton.LeftButton and self.drag_position is not None:
             self.move(event.globalPosition().toPoint() - self.drag_position)
             event.accept()
 

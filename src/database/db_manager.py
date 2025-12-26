@@ -7633,6 +7633,36 @@ class DBManager:
             logger.error(f"Error obteniendo relaciones con tag {tag_id}: {e}")
             return []
 
+    def get_lists_by_project_tag(self, project_id: int, tag_id: int) -> List[Dict]:
+        """
+        Obtiene todas las listas de un proyecto que tienen un tag específico
+
+        Args:
+            project_id: ID del proyecto
+            tag_id: ID del tag
+
+        Returns:
+            Lista de diccionarios con información de listas (id, name, description)
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute("""
+                SELECT DISTINCT l.id, l.name, l.description, l.created_at
+                FROM listas l
+                INNER JOIN project_relations pr ON l.id = pr.entity_id
+                INNER JOIN project_element_tag_associations a ON pr.id = a.project_relation_id
+                WHERE pr.project_id = ?
+                  AND pr.entity_type = 'list'
+                  AND a.tag_id = ?
+                ORDER BY l.name ASC
+            """, (project_id, tag_id))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error obteniendo listas del proyecto {project_id} con tag {tag_id}: {e}")
+            return []
+
     def update_project_relation_tags(self, relation_id: int, tag_ids: List[int]) -> bool:
         """
         Actualiza todos los tags de una relación de proyecto
@@ -8871,6 +8901,36 @@ class DBManager:
 
         except Exception as e:
             logger.error(f"Error obteniendo relaciones con tag {tag_id}: {e}")
+            return []
+
+    def get_lists_by_area_tag(self, area_id: int, tag_id: int) -> List[Dict]:
+        """
+        Obtiene todas las listas de un área que tienen un tag específico
+
+        Args:
+            area_id: ID del área
+            tag_id: ID del tag
+
+        Returns:
+            Lista de diccionarios con información de listas (id, name, description)
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute("""
+                SELECT DISTINCT l.id, l.name, l.description, l.created_at
+                FROM listas l
+                INNER JOIN area_relations ar ON l.id = ar.entity_id
+                INNER JOIN area_element_tag_associations a ON ar.id = a.area_relation_id
+                WHERE ar.area_id = ?
+                  AND ar.entity_type = 'list'
+                  AND a.tag_id = ?
+                ORDER BY l.name ASC
+            """, (area_id, tag_id))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error obteniendo listas del área {area_id} con tag {tag_id}: {e}")
             return []
 
     def get_tags_for_area_component_method(self, component_id: int) -> List[Dict]:

@@ -493,6 +493,7 @@ class BulkItemCreatorDialog(QWidget):
         tab_content.create_category_clicked.connect(self._on_create_category)
         tab_content.create_project_tag_clicked.connect(self._on_create_project_tag)
         tab_content.create_item_tag_clicked.connect(self._on_create_item_tag)
+        tab_content.create_list_clicked.connect(self._on_create_list)
 
     def _schedule_save(self, tab_content: TabContentWidget):
         """
@@ -794,7 +795,11 @@ class BulkItemCreatorDialog(QWidget):
 
         # Si tiene proyecto/área, siempre es lista
         if has_project_or_area and draft.list_name:
-            msg += f" en la lista '{draft.list_name}'"
+            # Diferenciar entre lista existente y nueva
+            if draft.list_id:
+                msg += f" a la lista '{draft.list_name}'"
+            else:
+                msg += f" en la lista '{draft.list_name}'"
 
             # Agregar relación con proyecto/área
             if draft.project_id:
@@ -903,15 +908,12 @@ class BulkItemCreatorDialog(QWidget):
         """
         Guarda items como lista vinculada a proyecto/área
 
-        Este método se usa cuando el checkbox "Crear como lista" está marcado.
-        Flujo:
-        1. Crear lista en BD
-        2. Crear items vinculados a la lista (con list_id)
-        3. Crear relación proyecto-lista (project_relations)
-        4. Asociar tags de proyecto a la relación
+        Dos modos de operación:
+        A) Si draft.list_id existe: Agregar items a lista existente
+        B) Si no existe: Crear nueva lista (flujo original)
 
         Args:
-            draft: Borrador con items, list_name y project_element_tags
+            draft: Borrador con items, list_id/list_name y project_element_tags
 
         Returns:
             Cantidad de items guardados
@@ -923,9 +925,46 @@ class BulkItemCreatorDialog(QWidget):
         entity_id = draft.project_id if is_project else draft.area_id
         entity_name = "Proyecto" if is_project else "Área"
 
-        logger.info(f"Guardando LISTA: '{draft.list_name}' → {entity_name} #{entity_id}")
-
         try:
+            # MODO A: Agregar a lista existente
+            if draft.list_id:
+                logger.info(f"Agregando items a LISTA EXISTENTE: '{draft.list_name}' (ID: {draft.list_id})")
+                lista_id = draft.list_id
+
+                # Paso 1.5: Preparar tags (lista existente)
+                item_tags_with_list_name = draft.item_tags.copy() if draft.item_tags else []
+                if draft.list_name and draft.list_name not in item_tags_with_list_name:
+                    item_tags_with_list_name.append(draft.list_name)
+
+                # Paso 2: Guardar items con list_id
+                for item_field in draft.items:
+                    if item_field.is_empty():
+                        continue
+
+                    try:
+                        item_id = self.db.add_item(
+                            category_id=draft.category_id,
+                            label=item_field.get_final_label(),
+                            content=item_field.content,
+                            item_type=item_field.item_type,
+                            is_sensitive=item_field.is_sensitive,
+                            list_id=lista_id,
+                            tags=item_tags_with_list_name
+                        )
+
+                        if item_id:
+                            saved_count += 1
+                            logger.debug(f"Item guardado en lista existente: {item_field.content[:30]}...")
+
+                    except Exception as e:
+                        logger.error(f"Error guardando item en lista existente: {e}")
+
+                logger.info(f"✓ {saved_count} items agregados a lista existente")
+                return saved_count
+
+            # MODO B: Crear nueva lista (flujo original)
+            logger.info(f"Creando NUEVA LISTA: '{draft.list_name}' → {entity_name} #{entity_id}")
+
             # Paso 1: Crear lista
             lista_id = self.db.create_lista(
                 category_id=draft.category_id,
@@ -1332,6 +1371,122 @@ class BulkItemCreatorDialog(QWidget):
                 self,
                 "Error",
                 f"Error al crear tag:\n{str(e)}"
+            )
+
+    def _on_create_list(self):
+        """Callback para crear nueva lista"""
+        # Obtener tab actual
+        current_tab = self._get_current_tab_content()
+        if not current_tab:
+            return
+
+        # Verificar que haya proyecto o área seleccionado
+        project_id = current_tab.context_section.get_project_id()
+        area_id = current_tab.context_section.get_area_id()
+
+        if not project_id and not area_id:
+            QMessageBox.warning(
+                self,
+                "Proyecto/Área requerido",
+                "Primero debe seleccionar un Proyecto o Área para crear una lista asociada."
+            )
+            return
+
+        # Verificar que haya tags de proyecto/área seleccionados
+        selected_tags = current_tab.project_tags_section.get_selected_tags()
+        if not selected_tags:
+            QMessageBox.warning(
+                self,
+                "Tags requeridos",
+                "Debe seleccionar al menos un tag de proyecto/área para crear la lista."
+            )
+            return
+
+        # Verificar categoría seleccionada
+        category_id = current_tab.category_section.get_category_id()
+        if not category_id:
+            QMessageBox.warning(
+                self,
+                "Categoría requerida",
+                "Debe seleccionar una categoría antes de crear la lista."
+            )
+            return
+
+        # Solicitar nombre de la lista
+        name, ok = QInputDialog.getText(
+            self,
+            "Crear Lista",
+            "Nombre de la lista:",
+            text=""
+        )
+
+        if not ok or not name.strip():
+            logger.info("Creación de lista cancelada")
+            return
+
+        try:
+            # 1. Crear lista en BD
+            lista_id = self.db.create_lista(
+                category_id=category_id,
+                name=name.strip(),
+                description=f"Lista creada desde Creador Masivo"
+            )
+
+            if not lista_id:
+                QMessageBox.critical(self, "Error", "No se pudo crear la lista")
+                return
+
+            logger.info(f"Lista creada: {name} (ID: {lista_id})")
+
+            # 2. Crear relación proyecto/área → lista
+            if project_id:
+                relation_id = self.db.add_project_relation(
+                    project_id=project_id,
+                    entity_type='list',
+                    entity_id=lista_id,
+                    description=f"Lista: {name.strip()}"
+                )
+            else:
+                relation_id = self.db.add_area_relation(
+                    area_id=area_id,
+                    entity_type='list',
+                    entity_id=lista_id,
+                    description=f"Lista: {name.strip()}"
+                )
+
+            logger.debug(f"Relación creada: relation_id={relation_id}")
+
+            # 3. Asociar tags de proyecto/área a la relación
+            for tag_name in selected_tags:
+                if project_id:
+                    tag = self.db.get_project_element_tag_by_name(tag_name)
+                    if tag:
+                        self.db.add_tag_to_project_relation(relation_id, tag['id'])
+                else:
+                    tag = self.db.get_area_element_tag_by_name(tag_name)
+                    if tag:
+                        self.db.assign_tag_to_area_relation(relation_id, tag['id'])
+
+                logger.debug(f"Tag '{tag_name}' asociado a lista")
+
+            # 4. Agregar lista al selector del tab actual y seleccionarla
+            current_tab.list_name_section.add_and_select_list(lista_id, name.strip())
+
+            # También refrescar las listas (por si hay otros tags)
+            current_tab._reload_lists_by_tags()
+
+            QMessageBox.information(
+                self,
+                "Éxito",
+                f"Lista '{name}' creada y seleccionada correctamente."
+            )
+
+        except Exception as e:
+            logger.error(f"Error creando lista: {e}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al crear lista:\n{str(e)}"
             )
 
     def _on_close_clicked(self):

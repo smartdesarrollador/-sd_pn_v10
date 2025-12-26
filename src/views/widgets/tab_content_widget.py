@@ -49,6 +49,7 @@ class TabContentWidget(QWidget):
     create_category_clicked = pyqtSignal()
     create_project_tag_clicked = pyqtSignal()
     create_item_tag_clicked = pyqtSignal()
+    create_list_clicked = pyqtSignal()  # Crear nueva lista
 
     def __init__(self, tab_id: str, tab_name: str = "Sin título", db_manager=None, tag_manager=None, parent=None):
         """
@@ -175,11 +176,12 @@ class TabContentWidget(QWidget):
         self.context_section.create_area_clicked.connect(self.create_area_clicked.emit)
 
         # Project tags section
-        self.project_tags_section.tags_changed.connect(self._on_data_changed)
+        self.project_tags_section.tags_changed.connect(self._on_project_tags_changed)
         self.project_tags_section.create_tag_clicked.connect(self.create_project_tag_clicked.emit)
 
         # List name section
-        self.list_name_section.name_changed.connect(self._on_data_changed)
+        self.list_name_section.list_changed.connect(self._on_list_changed)
+        self.list_name_section.create_list_clicked.connect(self.create_list_clicked.emit)
 
         # Category section
         self.category_section.category_changed.connect(self._on_data_changed)
@@ -245,6 +247,73 @@ class TabContentWidget(QWidget):
 
         self._on_data_changed()
 
+    def _on_project_tags_changed(self):
+        """Callback cuando cambian los tags de proyecto/área seleccionados"""
+        # Recargar listas disponibles según los tags seleccionados
+        self._reload_lists_by_tags()
+        self._on_data_changed()
+
+    def _on_list_changed(self, list_id: int | None, list_name: str):
+        """Callback cuando cambia la lista seleccionada"""
+        logger.debug(f"Lista cambiada: {list_name} (ID: {list_id})")
+        self._on_data_changed()
+
+    def _reload_lists_by_tags(self):
+        """
+        Recarga las listas disponibles según los tags de proyecto/área seleccionados
+
+        Si hay tags seleccionados, muestra solo las listas que tienen esos tags.
+        Si no hay tags seleccionados, limpia el selector.
+        """
+        if not self.db_manager:
+            return
+
+        try:
+            project_id = self.context_section.get_project_id()
+            area_id = self.context_section.get_area_id()
+            selected_tags = self.project_tags_section.get_selected_tags()
+
+            # Si no hay proyecto/área o no hay tags seleccionados, limpiar
+            if (not project_id and not area_id) or not selected_tags:
+                self.list_name_section.load_lists([])
+                logger.debug("No hay tags seleccionados, selector de listas limpiado")
+                return
+
+            # Obtener listas para cada tag seleccionado
+            all_lists = []
+            for tag_name in selected_tags:
+                # Obtener ID del tag
+                if project_id:
+                    tag = self.db_manager.get_project_element_tag_by_name(tag_name)
+                else:
+                    tag = self.db_manager.get_area_element_tag_by_name(tag_name)
+
+                if not tag:
+                    continue
+
+                tag_id = tag['id']
+
+                # Obtener listas con ese tag
+                if project_id:
+                    lists = self.db_manager.get_lists_by_project_tag(project_id, tag_id)
+                else:
+                    lists = self.db_manager.get_lists_by_area_tag(area_id, tag_id)
+
+                # Agregar a la lista general (evitar duplicados)
+                for lista in lists:
+                    if not any(l['id'] == lista['id'] for l in all_lists):
+                        all_lists.append(lista)
+
+            # Cargar en el selector
+            lists_data = [(l['id'], l['name']) for l in all_lists]
+            self.list_name_section.load_lists(lists_data)
+
+            logger.info(f"Cargadas {len(lists_data)} listas para tags: {selected_tags}")
+
+        except Exception as e:
+            logger.error(f"Error recargando listas por tags: {e}")
+            self.list_name_section.load_lists([])
+
     def _on_data_changed(self):
         """Callback cuando cambian los datos (trigger auto-save)"""
         self.data_changed.emit()
@@ -264,8 +333,11 @@ class TabContentWidget(QWidget):
         self.context_section.set_area_id(draft.area_id)
         self.context_section.set_create_as_list(draft.create_as_list)
 
-        # Cargar nombre de lista
-        self.list_name_section.set_name(draft.list_name or '')
+        # Cargar lista (por ID si existe, o por nombre para compatibilidad)
+        if draft.list_id:
+            self.list_name_section.set_list_by_id(draft.list_id)
+        elif draft.list_name:
+            self.list_name_section.set_name(draft.list_name)
 
         # Cargar categoría
         self.category_section.set_category_id(draft.category_id)
@@ -298,6 +370,7 @@ class TabContentWidget(QWidget):
             area_id=self.context_section.get_area_id(),
             category_id=self.category_section.get_category_id(),
             create_as_list=self.context_section.get_create_as_list(),
+            list_id=self.list_name_section.get_selected_list_id(),
             list_name=self.list_name_section.get_name(),
             project_element_tags=self.project_tags_section.get_selected_tags(),
             special_tag='',  # Siempre vacío - ya no se usa
@@ -307,7 +380,7 @@ class TabContentWidget(QWidget):
         # Agregar items (ahora son objetos ItemFieldData, no diccionarios)
         draft.items = self.items_section.get_non_empty_items()
 
-        logger.debug(f"Datos obtenidos: {draft.get_items_count()} items válidos")
+        logger.debug(f"Datos obtenidos: {draft.get_items_count()} items válidos (list_id={draft.list_id})")
         return draft
 
     def validate(self) -> tuple[bool, list[str]]:

@@ -11,7 +11,8 @@ MVP Features:
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QTextEdit, QScrollArea, QFrame,
-                             QMessageBox, QColorDialog, QApplication, QDialog, QStackedWidget)
+                             QMessageBox, QColorDialog, QApplication, QDialog, QStackedWidget,
+                             QCheckBox, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QColor
 import logging
@@ -177,6 +178,38 @@ class ProjectsWindow(QMainWindow, TaskbarMinimizableMixin):
         self.search_input.setPlaceholderText("🔍 Buscar proyectos...")
         self.search_input.textChanged.connect(self.on_search_changed)
         layout.addWidget(self.search_input)
+
+        # Filtro de estado
+        filter_layout = QHBoxLayout()
+        filter_label = QLabel("Filtro:")
+        filter_label.setStyleSheet("font-size: 9pt; color: #aaaaaa;")
+        filter_layout.addWidget(filter_label)
+
+        self.status_filter = QComboBox()
+        self.status_filter.addItems(["Activos", "Inactivos", "Todos"])
+        self.status_filter.setCurrentIndex(0)  # "Activos" por defecto
+        self.status_filter.currentIndexChanged.connect(self.on_filter_changed)
+        self.status_filter.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                border: 1px solid #3d3d3d;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #ffffff;
+                margin-right: 5px;
+            }
+        """)
+        filter_layout.addWidget(self.status_filter)
+        layout.addLayout(filter_layout)
 
         # Botón nuevo proyecto
         new_btn = QPushButton("+ Nuevo Proyecto")
@@ -475,14 +508,113 @@ class ProjectsWindow(QMainWindow, TaskbarMinimizableMixin):
     # ==================== EVENTOS ====================
 
     def load_projects(self):
-        """Carga todos los proyectos en la lista"""
+        """Carga todos los proyectos en la lista según el filtro seleccionado"""
         self.projects_list.clear()
-        projects = self.project_manager.get_all_projects(active_only=True)
 
+        # Determinar filtro de estado
+        filter_text = self.status_filter.currentText()
+        if filter_text == "Activos":
+            active_only = True
+            show_only_inactive = False
+        elif filter_text == "Inactivos":
+            active_only = False
+            show_only_inactive = True
+        else:  # "Todos"
+            active_only = False
+            show_only_inactive = False
+
+        # Obtener proyectos según filtro
+        projects = self.project_manager.get_all_projects(active_only=active_only)
+
+        # Si se seleccionó solo inactivos, filtrar
+        if show_only_inactive:
+            projects = [p for p in projects if not p.get('is_active', True)]
+
+        # Crear items con checkboxes
         for project in projects:
-            item = QListWidgetItem(f"{project['icon']} {project['name']}")
-            item.setData(Qt.ItemDataRole.UserRole, project['id'])
-            self.projects_list.addItem(item)
+            # Crear item de lista
+            list_item = QListWidgetItem()
+            list_item.setData(Qt.ItemDataRole.UserRole, project['id'])
+
+            # Crear widget personalizado con checkbox
+            item_widget = QWidget()
+            item_layout = QHBoxLayout(item_widget)
+            item_layout.setContentsMargins(5, 2, 5, 2)
+            item_layout.setSpacing(8)
+
+            # Checkbox
+            checkbox = QCheckBox()
+            checkbox.setChecked(project.get('is_active', True))
+            checkbox.setToolTip("Activar/Desactivar proyecto")
+            checkbox.stateChanged.connect(
+                lambda state, pid=project['id']: self.on_project_checkbox_changed(pid, state)
+            )
+            checkbox.setStyleSheet("""
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid #3d3d3d;
+                    border-radius: 3px;
+                    background-color: #2d2d2d;
+                }
+                QCheckBox::indicator:checked {
+                    background-color: #00ff88;
+                    border-color: #00ff88;
+                }
+                QCheckBox::indicator:checked:hover {
+                    background-color: #00dd77;
+                }
+                QCheckBox::indicator:hover {
+                    border-color: #00ff88;
+                }
+            """)
+            item_layout.addWidget(checkbox)
+
+            # Nombre del proyecto
+            name_label = QLabel(f"{project['name']}")
+            name_label.setStyleSheet("color: #ffffff; font-size: 10pt;")
+            item_layout.addWidget(name_label, 1)
+
+            item_layout.addStretch()
+
+            # Configurar tamaño del item
+            list_item.setSizeHint(item_widget.sizeHint())
+
+            # Agregar a la lista
+            self.projects_list.addItem(list_item)
+            self.projects_list.setItemWidget(list_item, item_widget)
+
+    def on_filter_changed(self):
+        """Maneja cambio en el filtro de estado"""
+        self.load_projects()
+
+    def on_project_checkbox_changed(self, project_id: int, state: int):
+        """Maneja cambio de estado del checkbox de un proyecto"""
+        try:
+            # Convertir estado del checkbox a booleano
+            is_active = state == Qt.CheckState.Checked.value
+
+            # Actualizar en la base de datos
+            success = self.project_manager.update_project(project_id, is_active=is_active)
+
+            if success:
+                logger.info(f"Proyecto {project_id} {'activado' if is_active else 'desactivado'}")
+
+                # Si el proyecto actual se desactivó y estamos en filtro "Activos", limpiar vista
+                if not is_active and self.current_project_id == project_id:
+                    filter_text = self.status_filter.currentText()
+                    if filter_text == "Activos":
+                        # Recargar lista para que desaparezca de la vista
+                        self.load_projects()
+            else:
+                QMessageBox.warning(self, "Error", "No se pudo actualizar el estado del proyecto")
+                # Revertir checkbox
+                self.load_projects()
+
+        except Exception as e:
+            logger.error(f"Error actualizando estado del proyecto {project_id}: {e}")
+            QMessageBox.critical(self, "Error", f"Error al actualizar estado:\n{str(e)}")
+            self.load_projects()
 
     def on_search_changed(self, text):
         """Filtra proyectos por búsqueda"""
@@ -490,13 +622,80 @@ class ProjectsWindow(QMainWindow, TaskbarMinimizableMixin):
             self.load_projects()
             return
 
+        # Determinar filtro de estado
+        filter_text = self.status_filter.currentText()
+        if filter_text == "Activos":
+            active_only = True
+            show_only_inactive = False
+        elif filter_text == "Inactivos":
+            active_only = False
+            show_only_inactive = True
+        else:  # "Todos"
+            active_only = False
+            show_only_inactive = False
+
         results = self.project_manager.search_projects(text)
         self.projects_list.clear()
 
+        # Aplicar filtro de estado a los resultados de búsqueda
+        if filter_text == "Activos":
+            results = [p for p in results if p.get('is_active', True)]
+        elif filter_text == "Inactivos":
+            results = [p for p in results if not p.get('is_active', True)]
+
+        # Crear items con checkboxes
         for project in results:
-            item = QListWidgetItem(f"{project['icon']} {project['name']}")
-            item.setData(Qt.ItemDataRole.UserRole, project['id'])
-            self.projects_list.addItem(item)
+            # Crear item de lista
+            list_item = QListWidgetItem()
+            list_item.setData(Qt.ItemDataRole.UserRole, project['id'])
+
+            # Crear widget personalizado con checkbox
+            item_widget = QWidget()
+            item_layout = QHBoxLayout(item_widget)
+            item_layout.setContentsMargins(5, 2, 5, 2)
+            item_layout.setSpacing(8)
+
+            # Checkbox
+            checkbox = QCheckBox()
+            checkbox.setChecked(project.get('is_active', True))
+            checkbox.setToolTip("Activar/Desactivar proyecto")
+            checkbox.stateChanged.connect(
+                lambda state, pid=project['id']: self.on_project_checkbox_changed(pid, state)
+            )
+            checkbox.setStyleSheet("""
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid #3d3d3d;
+                    border-radius: 3px;
+                    background-color: #2d2d2d;
+                }
+                QCheckBox::indicator:checked {
+                    background-color: #00ff88;
+                    border-color: #00ff88;
+                }
+                QCheckBox::indicator:checked:hover {
+                    background-color: #00dd77;
+                }
+                QCheckBox::indicator:hover {
+                    border-color: #00ff88;
+                }
+            """)
+            item_layout.addWidget(checkbox)
+
+            # Nombre del proyecto
+            name_label = QLabel(f"{project['name']}")
+            name_label.setStyleSheet("color: #ffffff; font-size: 10pt;")
+            item_layout.addWidget(name_label, 1)
+
+            item_layout.addStretch()
+
+            # Configurar tamaño del item
+            list_item.setSizeHint(item_widget.sizeHint())
+
+            # Agregar a la lista
+            self.projects_list.addItem(list_item)
+            self.projects_list.setItemWidget(list_item, item_widget)
 
     def on_new_project(self):
         """Crea un nuevo proyecto"""

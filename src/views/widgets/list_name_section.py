@@ -255,6 +255,22 @@ class ListNameSection(QWidget):
             self.list_combo.setCurrentIndex(index)
             logger.info(f"Lista '{list_name}' agregada y seleccionada")
 
+    def select_list_by_id(self, list_id: int):
+        """
+        Selecciona una lista por su ID (asume que ya está en el combo)
+
+        Args:
+            list_id: ID de la lista a seleccionar
+        """
+        index = self.list_combo.findData(list_id)
+        if index >= 0:
+            self.list_combo.setCurrentIndex(index)
+            logger.debug(f"Lista ID {list_id} seleccionada (index: {index})")
+        else:
+            logger.warning(f"No se encontró lista con ID {list_id} en el selector")
+            # Mantener en "Nueva lista" si no se encuentra
+            self.list_combo.setCurrentIndex(0)
+
     def clear(self):
         """Limpia la selección"""
         self.list_combo.setCurrentIndex(0)

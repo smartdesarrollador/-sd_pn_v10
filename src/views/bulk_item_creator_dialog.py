@@ -20,6 +20,7 @@ from PyQt6.QtGui import QFont, QScreen
 from src.views.widgets.tab_content_widget import TabContentWidget
 from src.core.draft_persistence_manager import DraftPersistenceManager
 from src.core.project_element_tag_manager import ProjectElementTagManager
+from src.core.area_element_tag_manager import AreaElementTagManager
 from src.models.item_draft import ItemDraft
 import uuid
 import logging
@@ -97,8 +98,9 @@ class BulkItemCreatorDialog(QWidget):
         self.save_timer.setSingleShot(True)
         self.save_timer.timeout.connect(self._save_current_tab)
 
-        # Tag Manager
-        self.tag_manager = ProjectElementTagManager(self.db)
+        # Tag Managers
+        self.project_tag_manager = ProjectElementTagManager(self.db)
+        self.area_tag_manager = AreaElementTagManager(self.db)
 
         # Configuración de ventana
         self.setWindowTitle("⚡ Creador Masivo de Items")
@@ -386,10 +388,11 @@ class BulkItemCreatorDialog(QWidget):
 
         # Crear widget de contenido
         tab_content = TabContentWidget(
-            tab_id, 
-            tab_name, 
-            db_manager=self.db, 
-            tag_manager=self.tag_manager,
+            tab_id,
+            tab_name,
+            db_manager=self.db,
+            project_tag_manager=self.project_tag_manager,
+            area_tag_manager=self.area_tag_manager,
             parent=self
         )
 
@@ -416,10 +419,11 @@ class BulkItemCreatorDialog(QWidget):
         """
         # Crear widget de contenido
         tab_content = TabContentWidget(
-            draft.tab_id, 
-            draft.tab_name, 
+            draft.tab_id,
+            draft.tab_name,
             db_manager=self.db,
-            tag_manager=self.tag_manager,
+            project_tag_manager=self.project_tag_manager,
+            area_tag_manager=self.area_tag_manager,
             parent=self
         )
 
@@ -1268,8 +1272,27 @@ class BulkItemCreatorDialog(QWidget):
             return
 
         try:
-            # Crear tag usando el TagManager
-            tag = self.tag_manager.create_tag(
+            # Determinar si es proyecto o área
+            project_id = current_tab.context_section.get_project_id()
+            area_id = current_tab.context_section.get_area_id()
+
+            # Usar el TagManager correcto según el tipo de entidad
+            if project_id:
+                tag_manager = self.project_tag_manager
+                entity_type = "proyecto"
+            elif area_id:
+                tag_manager = self.area_tag_manager
+                entity_type = "área"
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    "No se detectó proyecto ni área seleccionado."
+                )
+                return
+
+            # Crear tag usando el TagManager correcto
+            tag = tag_manager.create_tag(
                 name=name.strip(),
                 color="#2196F3",  # Color por defecto (azul)
                 description=f"Tag creado desde Creador Masivo"
@@ -1283,15 +1306,12 @@ class BulkItemCreatorDialog(QWidget):
                 )
                 return
 
-            logger.info(f"Tag de proyecto/área creado: {name} (ID: {tag.id})")
+            logger.info(f"Tag de {entity_type} creado: {name} (ID: {tag.id})")
 
             # Recargar tags en el tab actual
-            project_id = current_tab.context_section.get_project_id()
-            area_id = current_tab.context_section.get_area_id()
-
             if project_id:
                 # Cargar tags del proyecto
-                tags = self.tag_manager.get_tags_for_project(project_id)
+                tags = tag_manager.get_tags_for_project(project_id)
                 tag_names = [t.name for t in tags]
 
                 # Agregar el tag recién creado si no está en la lista
@@ -1304,7 +1324,7 @@ class BulkItemCreatorDialog(QWidget):
 
             elif area_id:
                 # Cargar tags del área
-                tags = self.tag_manager.get_tags_for_area(area_id)
+                tags = tag_manager.get_tags_for_area(area_id)
                 tag_names = [t.name for t in tags]
 
                 # Agregar el tag recién creado si no está en la lista
@@ -1490,33 +1510,44 @@ class BulkItemCreatorDialog(QWidget):
                     logger.debug(f"Nueva relación área-lista creada: {relation_id}")
 
             # 3. Asociar tags de proyecto/área a la relación (evitar duplicados)
+            logger.info(f"=== Asociando {len(selected_tags)} tags a relación {relation_id} ===")
             for tag_name in selected_tags:
                 if project_id:
                     tag = self.db.get_project_element_tag_by_name(tag_name)
                     if tag:
+                        logger.debug(f"Tag '{tag_name}' encontrado con ID: {tag['id']}")
                         # Verificar si el tag ya está asociado
                         existing_tags = self.db.get_tags_for_project_relation(relation_id)
+                        logger.debug(f"Tags existentes en relación: {[t['id'] for t in existing_tags]}")
                         if tag['id'] not in [t['id'] for t in existing_tags]:
                             self.db.add_tag_to_project_relation(relation_id, tag['id'])
-                            logger.debug(f"Tag '{tag_name}' asociado a relación proyecto-lista")
+                            logger.info(f"✅ Tag '{tag_name}' (ID: {tag['id']}) asociado a relación proyecto-lista {relation_id}")
                         else:
-                            logger.debug(f"Tag '{tag_name}' ya estaba asociado a relación proyecto-lista")
+                            logger.info(f"Tag '{tag_name}' (ID: {tag['id']}) ya estaba asociado a relación proyecto-lista {relation_id}")
+                    else:
+                        logger.warning(f"Tag '{tag_name}' no encontrado en BD")
                 else:
                     tag = self.db.get_area_element_tag_by_name(tag_name)
                     if tag:
+                        logger.debug(f"Tag '{tag_name}' encontrado con ID: {tag['id']}")
                         # Verificar si el tag ya está asociado
                         existing_tags = self.db.get_tags_for_area_relation(relation_id)
+                        logger.debug(f"Tags existentes en relación: {[t['id'] for t in existing_tags]}")
                         if tag['id'] not in [t['id'] for t in existing_tags]:
                             self.db.assign_tag_to_area_relation(relation_id, tag['id'])
-                            logger.debug(f"Tag '{tag_name}' asociado a relación área-lista")
+                            logger.info(f"✅ Tag '{tag_name}' (ID: {tag['id']}) asociado a relación área-lista {relation_id}")
                         else:
-                            logger.debug(f"Tag '{tag_name}' ya estaba asociado a relación área-lista")
+                            logger.info(f"Tag '{tag_name}' (ID: {tag['id']}) ya estaba asociado a relación área-lista {relation_id}")
+                    else:
+                        logger.warning(f"Tag '{tag_name}' no encontrado en BD")
 
-            # 4. Agregar lista al selector del tab actual y seleccionarla
-            current_tab.list_name_section.add_and_select_list(lista_id, name.strip())
+            logger.info(f"=== Asociación de tags completada ===")
 
-            # También refrescar las listas (por si hay otros tags)
+            # 4. Recargar listas desde BD (incluye la recién creada con todos sus tags)
             current_tab._reload_lists_by_tags()
+
+            # 5. Seleccionar la lista recién creada/reutilizada
+            current_tab.list_name_section.select_list_by_id(lista_id)
 
             # Mensaje de éxito diferente según si se creó o reutilizó
             action = "creada" if was_created else "reutilizada"

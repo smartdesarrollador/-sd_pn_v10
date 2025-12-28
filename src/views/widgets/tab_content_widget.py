@@ -51,7 +51,8 @@ class TabContentWidget(QWidget):
     create_item_tag_clicked = pyqtSignal()
     create_list_clicked = pyqtSignal()  # Crear nueva lista
 
-    def __init__(self, tab_id: str, tab_name: str = "Sin título", db_manager=None, tag_manager=None, parent=None):
+    def __init__(self, tab_id: str, tab_name: str = "Sin título", db_manager=None, tag_manager=None,
+                 project_tag_manager=None, area_tag_manager=None, parent=None):
         """
         Inicializa el widget de contenido de tab
 
@@ -59,14 +60,23 @@ class TabContentWidget(QWidget):
             tab_id: UUID del tab
             tab_name: Nombre del tab
             db_manager: Instancia de DBManager
-            tag_manager: Instancia de ProjectElementTagManager
+            tag_manager: (Deprecated) Instancia de ProjectElementTagManager - usar project_tag_manager
+            project_tag_manager: Instancia de ProjectElementTagManager
+            area_tag_manager: Instancia de AreaElementTagManager
             parent: Widget padre
         """
         super().__init__(parent)
         self.tab_id = tab_id
         self.tab_name = tab_name
         self.db_manager = db_manager
-        self.tag_manager = tag_manager
+
+        # Backward compatibility: si se pasa tag_manager, usarlo como project_tag_manager
+        self.project_tag_manager = project_tag_manager or tag_manager
+        self.area_tag_manager = area_tag_manager
+
+        # Mantener referencia legacy
+        self.tag_manager = self.project_tag_manager
+
         self._setup_ui()
         self._connect_signals()
 
@@ -201,9 +211,9 @@ class TabContentWidget(QWidget):
         self.project_tags_section.show_for_project_or_area(has_project_or_area)
 
         # Cargar tags del proyecto seleccionado
-        if project_id is not None and self.tag_manager:
+        if project_id is not None and self.project_tag_manager:
             try:
-                tags = self.tag_manager.get_tags_for_project(project_id)
+                tags = self.project_tag_manager.get_tags_for_project(project_id)
                 tag_names = [tag.name for tag in tags]
                 self.project_tags_section.load_tags(tag_names)
                 logger.debug(f"Cargados {len(tag_names)} tags para proyecto {project_id}")
@@ -222,11 +232,11 @@ class TabContentWidget(QWidget):
         self.project_tags_section.show_for_project_or_area(has_project_or_area)
 
         # Cargar tags del área seleccionada
-        if area_id is not None and self.tag_manager:
+        if area_id is not None and self.area_tag_manager:
             try:
                 # Intenta usar método get_tags_for_area si existe, o lista vacía
-                if hasattr(self.tag_manager, 'get_tags_for_area'):
-                    tags = self.tag_manager.get_tags_for_area(area_id)
+                if hasattr(self.area_tag_manager, 'get_tags_for_area'):
+                    tags = self.area_tag_manager.get_tags_for_area(area_id)
                     # Verificar si devuelve objetos o dicts (si implementamos fallback a db directa)
                     tag_names = []
                     for tag in tags:
@@ -281,17 +291,24 @@ class TabContentWidget(QWidget):
 
             # Obtener listas para cada tag seleccionado
             all_lists = []
+            logger.debug(f"🔍 Buscando listas para {len(selected_tags)} tags: {selected_tags}")
             for tag_name in selected_tags:
                 # Obtener ID del tag
                 if project_id:
                     tag = self.db_manager.get_project_element_tag_by_name(tag_name)
+                    entity_type = "proyecto"
+                    entity_id = project_id
                 else:
                     tag = self.db_manager.get_area_element_tag_by_name(tag_name)
+                    entity_type = "área"
+                    entity_id = area_id
 
                 if not tag:
+                    logger.warning(f"Tag '{tag_name}' no encontrado en BD")
                     continue
 
                 tag_id = tag['id']
+                logger.debug(f"Tag '{tag_name}' tiene ID: {tag_id}")
 
                 # Obtener listas con ese tag
                 if project_id:
@@ -299,10 +316,13 @@ class TabContentWidget(QWidget):
                 else:
                     lists = self.db_manager.get_lists_by_area_tag(area_id, tag_id)
 
+                logger.debug(f"Encontradas {len(lists)} listas para tag '{tag_name}' (ID:{tag_id}) en {entity_type} {entity_id}")
+
                 # Agregar a la lista general (evitar duplicados)
                 for lista in lists:
                     if not any(l['id'] == lista['id'] for l in all_lists):
                         all_lists.append(lista)
+                        logger.debug(f"Lista '{lista['name']}' (ID:{lista['id']}) agregada")
 
             # Cargar en el selector
             lists_data = [(l['id'], l['name']) for l in all_lists]

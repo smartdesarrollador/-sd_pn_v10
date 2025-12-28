@@ -1425,49 +1425,92 @@ class BulkItemCreatorDialog(QWidget):
             return
 
         try:
-            # 1. Crear lista en BD
-            lista_id = self.db.create_lista(
-                category_id=category_id,
-                name=name.strip(),
-                description=f"Lista creada desde Creador Masivo"
-            )
+            # 1. Verificar si la lista ya existe (get_or_create)
+            existing_lista = self.db.get_lista_by_name(category_id, name.strip())
 
-            if not lista_id:
-                QMessageBox.critical(self, "Error", "No se pudo crear la lista")
-                return
-
-            logger.info(f"Lista creada: {name} (ID: {lista_id})")
-
-            # 2. Crear relación proyecto/área → lista
-            if project_id:
-                relation_id = self.db.add_project_relation(
-                    project_id=project_id,
-                    entity_type='list',
-                    entity_id=lista_id,
-                    description=f"Lista: {name.strip()}"
-                )
+            if existing_lista:
+                lista_id = existing_lista['id']
+                logger.info(f"Lista '{name}' ya existe en categoría {category_id}, reutilizando (ID: {lista_id})")
+                was_created = False
             else:
-                relation_id = self.db.add_area_relation(
-                    area_id=area_id,
-                    entity_type='list',
-                    entity_id=lista_id,
-                    description=f"Lista: {name.strip()}"
+                # Crear nueva lista
+                lista_id = self.db.create_lista(
+                    category_id=category_id,
+                    name=name.strip(),
+                    description=f"Lista creada desde Creador Masivo"
                 )
 
-            logger.debug(f"Relación creada: relation_id={relation_id}")
+                if not lista_id:
+                    QMessageBox.critical(self, "Error", "No se pudo crear la lista")
+                    return
 
-            # 3. Asociar tags de proyecto/área a la relación
+                logger.info(f"Lista creada: {name} (ID: {lista_id})")
+                was_created = True
+
+            # 2. Crear relación proyecto/área → lista (si no existe ya)
+            relation_id = None
+
+            if project_id:
+                # Verificar si ya existe la relación
+                existing_relations = self.db.get_project_relations(project_id)
+                existing_relation = next(
+                    (r for r in existing_relations if r['entity_type'] == 'list' and r['entity_id'] == lista_id),
+                    None
+                )
+
+                if existing_relation:
+                    relation_id = existing_relation['id']
+                    logger.debug(f"Relación proyecto-lista ya existe: {relation_id}")
+                else:
+                    relation_id = self.db.add_project_relation(
+                        project_id=project_id,
+                        entity_type='list',
+                        entity_id=lista_id,
+                        description=f"Lista: {name.strip()}"
+                    )
+                    logger.debug(f"Nueva relación proyecto-lista creada: {relation_id}")
+            else:
+                # Verificar si ya existe la relación con área
+                existing_relations = self.db.get_area_relations(area_id)
+                existing_relation = next(
+                    (r for r in existing_relations if r['entity_type'] == 'list' and r['entity_id'] == lista_id),
+                    None
+                )
+
+                if existing_relation:
+                    relation_id = existing_relation['id']
+                    logger.debug(f"Relación área-lista ya existe: {relation_id}")
+                else:
+                    relation_id = self.db.add_area_relation(
+                        area_id=area_id,
+                        entity_type='list',
+                        entity_id=lista_id,
+                        description=f"Lista: {name.strip()}"
+                    )
+                    logger.debug(f"Nueva relación área-lista creada: {relation_id}")
+
+            # 3. Asociar tags de proyecto/área a la relación (evitar duplicados)
             for tag_name in selected_tags:
                 if project_id:
                     tag = self.db.get_project_element_tag_by_name(tag_name)
                     if tag:
-                        self.db.add_tag_to_project_relation(relation_id, tag['id'])
+                        # Verificar si el tag ya está asociado
+                        existing_tags = self.db.get_tags_for_project_relation(relation_id)
+                        if tag['id'] not in [t['id'] for t in existing_tags]:
+                            self.db.add_tag_to_project_relation(relation_id, tag['id'])
+                            logger.debug(f"Tag '{tag_name}' asociado a relación proyecto-lista")
+                        else:
+                            logger.debug(f"Tag '{tag_name}' ya estaba asociado a relación proyecto-lista")
                 else:
                     tag = self.db.get_area_element_tag_by_name(tag_name)
                     if tag:
-                        self.db.assign_tag_to_area_relation(relation_id, tag['id'])
-
-                logger.debug(f"Tag '{tag_name}' asociado a lista")
+                        # Verificar si el tag ya está asociado
+                        existing_tags = self.db.get_tags_for_area_relation(relation_id)
+                        if tag['id'] not in [t['id'] for t in existing_tags]:
+                            self.db.assign_tag_to_area_relation(relation_id, tag['id'])
+                            logger.debug(f"Tag '{tag_name}' asociado a relación área-lista")
+                        else:
+                            logger.debug(f"Tag '{tag_name}' ya estaba asociado a relación área-lista")
 
             # 4. Agregar lista al selector del tab actual y seleccionarla
             current_tab.list_name_section.add_and_select_list(lista_id, name.strip())
@@ -1475,10 +1518,14 @@ class BulkItemCreatorDialog(QWidget):
             # También refrescar las listas (por si hay otros tags)
             current_tab._reload_lists_by_tags()
 
+            # Mensaje de éxito diferente según si se creó o reutilizó
+            action = "creada" if was_created else "reutilizada"
+            entity_type = "proyecto" if project_id else "área"
             QMessageBox.information(
                 self,
                 "Éxito",
-                f"Lista '{name}' creada y seleccionada correctamente."
+                f"Lista '{name}' {action} y relacionada con {entity_type} correctamente.\n"
+                f"Tags asociados: {', '.join(selected_tags)}"
             )
 
         except Exception as e:

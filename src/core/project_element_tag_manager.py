@@ -118,7 +118,7 @@ class ProjectElementTagManager(QObject):
     def create_tag(self, name: str, color: str = "#3498db",
                    description: str = "") -> Optional[ProjectElementTag]:
         """
-        Crea un nuevo tag con validación
+        Crea un nuevo tag con validación, o retorna el existente si ya existe (get_or_create)
 
         Args:
             name: Nombre del tag (único)
@@ -126,7 +126,7 @@ class ProjectElementTagManager(QObject):
             description: Descripción del tag
 
         Returns:
-            Tag creado o None si falla
+            Tag creado o existente, None si falla la validación
         """
         # Validar nombre
         is_valid, error_msg = self.validate_tag_name(name)
@@ -140,6 +140,15 @@ class ProjectElementTagManager(QObject):
             return None
 
         try:
+            # Primero verificar si el tag ya existe por nombre
+            existing_tag_data = self.db.get_project_element_tag_by_name(name)
+            if existing_tag_data:
+                logger.info(f"Tag '{name}' ya existe, retornando el existente (ID: {existing_tag_data['id']})")
+                tag = create_tag_from_db_row(existing_tag_data)
+                self._cache_tag(tag)
+                return tag
+
+            # Si no existe, crearlo
             tag_id = self.db.add_project_element_tag(name, color, description)
             tag_data = self.db.get_project_element_tag_by_id(tag_id)
 
@@ -152,10 +161,6 @@ class ProjectElementTagManager(QObject):
 
             return None
 
-        except ValueError as e:
-            # Ya existe un tag con ese nombre
-            logger.error(f"Error creando tag: {e}")
-            return None
         except Exception as e:
             logger.error(f"Error creando tag: {e}")
             return None

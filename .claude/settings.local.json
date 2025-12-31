@@ -77,7 +77,10 @@
       "Bash(test:*)",
       "Bash(./venv/Scripts/python.exe -m pip:*)",
       "Bash(./venv/Scripts/python.exe:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(move \"D:\\\\ARCHIVOS_GENERAL\\\\j\\\\proyectos_python\\\\sidebar_v9_panel\\\\util\\\\image_item_widget.py\" \"D:\\\\ARCHIVOS_GENERAL\\\\j\\\\proyectos_python\\\\sidebar_v9_panel\\\\src\\\\views\\\\widgets\\\\image_item_widget.py\")",
+      "Bash(cmd /c move \"D:\\\\ARCHIVOS_GENERAL\\\\j\\\\proyectos_python\\\\sidebar_v9_panel\\\\util\\\\image_item_widget.py\" \"D:\\\\ARCHIVOS_GENERAL\\\\j\\\\proyectos_python\\\\sidebar_v9_panel\\\\src\\\\views\\\\widgets\\\\image_item_widget.py\")",
+      "Bash(cmd /c del /Q \"D:\\\\ARCHIVOS_GENERAL\\\\j\\\\proyectos_python\\\\sidebar_v9_panel\\\\util\\\\image_item_widget.py\")"
     ],
     "deny": [],
     "ask": []

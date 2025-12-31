@@ -12,12 +12,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButt
 from PyQt6.QtCore import Qt, pyqtSignal
 from .headers.group_header import GroupHeaderWidget
 from .items import TextItemWidget, CodeItemWidget, URLItemWidget, PathItemWidget, WebStaticItemWidget
-import sys
-from pathlib import Path
-
-# Importar ImageItemWidget desde util (temporalmente)
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "util"))
-from image_item_widget import ImageItemWidget
+from src.views.widgets.image_item_widget import ImageItemWidget
 
 
 class ItemGroupWidget(QWidget):

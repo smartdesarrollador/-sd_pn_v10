@@ -593,11 +593,8 @@ class ItemFieldsSection(QWidget):
         logger.info(f"Screenshot captured: {filepath}")
 
         try:
-            # Importar widget de preview aquí para evitar dependencia circular
-            import sys
-            from pathlib import Path
-            sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "util"))
-            from screenshot_preview_widget import ScreenshotPreviewWidget
+            # Importar widget de preview
+            from src.views.widgets.screenshot_preview_widget import ScreenshotPreviewWidget
 
             # Generar label automático
             from datetime import datetime
@@ -727,10 +724,7 @@ class ItemFieldsSection(QWidget):
         # Agregar screenshots desde datos
         if screenshots_data:
             try:
-                import sys
-                from pathlib import Path
-                sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "util"))
-                from screenshot_preview_widget import ScreenshotPreviewWidget
+                from src.views.widgets.screenshot_preview_widget import ScreenshotPreviewWidget
 
                 for idx, screenshot_data in enumerate(screenshots_data):
                     filepath = screenshot_data.get('filepath', '')

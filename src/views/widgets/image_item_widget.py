@@ -70,6 +70,7 @@ class ImageItemWidget(QFrame):
 
         self.item_data = item_data
         self.db = db_manager
+        self.original_pixmap = None  # Guardar pixmap original para re-escalar
 
         # Logging para debug
         logger.info(f"=== ImageItemWidget.__init__ ===")
@@ -170,10 +171,17 @@ class ImageItemWidget(QFrame):
 
     def _setup_ui(self):
         """Configurar interfaz del widget - Diseño similar a ItemButton"""
-        # Frame properties (altura dinámica para acomodar miniatura)
-        self.setMinimumHeight(200)  # Altura mínima para acomodar miniatura de 150px
+        # Frame properties (altura dinámica y redimensionable)
+        self.setMinimumHeight(180)  # Altura mínima
         self.setMinimumWidth(300)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Permitir redimensionamiento vertical
+        from PyQt6.QtWidgets import QSizePolicy
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding  # Permite expansión vertical
+        )
 
         # Layout principal horizontal
         main_layout = QHBoxLayout(self)
@@ -216,13 +224,22 @@ class ImageItemWidget(QFrame):
         self.title_label.setWordWrap(True)
         content_layout.addWidget(self.title_label)
 
-        # Miniatura clickeable (más grande: 150x150)
+        # Miniatura clickeable (redimensionable, min 150x150, max 500x500)
         self.thumbnail_label = QLabel()
-        self.thumbnail_label.setFixedSize(150, 150)
-        self.thumbnail_label.setScaledContents(False)
+        self.thumbnail_label.setMinimumSize(150, 150)
+        self.thumbnail_label.setMaximumSize(500, 500)
+        self.thumbnail_label.setScaledContents(False)  # Mantener aspect ratio
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumbnail_label.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.thumbnail_label.setToolTip("Clic para ver imagen completa")
+        self.thumbnail_label.setToolTip("Clic para ver imagen completa. Arrastra el borde del contenedor para redimensionar.")
+
+        # Size policy para permitir crecimiento
+        from PyQt6.QtWidgets import QSizePolicy
+        self.thumbnail_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
         self.thumbnail_label.setStyleSheet("""
             QLabel {
                 border: 2px solid #555;
@@ -235,7 +252,9 @@ class ImageItemWidget(QFrame):
         """)
         # Hacer clickeable
         self.thumbnail_label.mousePressEvent = lambda event: self._on_thumbnail_clicked()
-        content_layout.addWidget(self.thumbnail_label)
+
+        # Centrar la miniatura horizontalmente
+        content_layout.addWidget(self.thumbnail_label, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Descripción (si existe)
         description = self.item_data.get('description', '')
@@ -361,7 +380,7 @@ class ImageItemWidget(QFrame):
             return
 
         try:
-            # Cargar imagen
+            # Cargar imagen original
             logger.debug(f"Cargando QPixmap desde: {self.image_path}")
             pixmap = QPixmap(self.image_path)
 
@@ -370,15 +389,14 @@ class ImageItemWidget(QFrame):
                 logger.error(f"QPixmap.isNull() - No se pudo cargar imagen: {self.image_path}")
                 return
 
-            # Escalar manteniendo aspect ratio (150x150 para mayor visibilidad)
-            scaled_pixmap = pixmap.scaled(
-                150, 150,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
+            # Guardar pixmap original para re-escalar después
+            self.original_pixmap = pixmap
 
-            self.thumbnail_label.setPixmap(scaled_pixmap)
-            logger.info(f"✓ Thumbnail cargado exitosamente (150x150): {self.image_path}")
+            # Escalar a tamaño del label manteniendo aspect ratio
+            self._update_thumbnail_scale()
+
+            logger.info(f"✓ Thumbnail cargado exitosamente (tamaño original: {pixmap.width()}x{pixmap.height()}): {self.image_path}")
+            logger.info(f"  Miniatura redimensionable entre 150x150 y 500x500")
 
         except Exception as e:
             self.thumbnail_label.setText("❌\nError")
@@ -439,3 +457,28 @@ class ImageItemWidget(QFrame):
     def clear_highlight(self):
         """Limpiar resaltado de búsqueda"""
         self._apply_styles()
+
+    def _update_thumbnail_scale(self):
+        """Actualizar escala de la miniatura según tamaño del label"""
+        if not self.original_pixmap or self.original_pixmap.isNull():
+            return
+
+        # Obtener tamaño disponible del label
+        label_size = self.thumbnail_label.size()
+
+        # Escalar pixmap manteniendo aspect ratio
+        scaled_pixmap = self.original_pixmap.scaled(
+            label_size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+
+        self.thumbnail_label.setPixmap(scaled_pixmap)
+        logger.debug(f"Thumbnail re-escalado a: {scaled_pixmap.width()}x{scaled_pixmap.height()}")
+
+    def resizeEvent(self, event):
+        """Detectar cambios de tamaño y re-escalar miniatura"""
+        super().resizeEvent(event)
+        # Re-escalar miniatura cuando cambia el tamaño del widget
+        if hasattr(self, 'original_pixmap') and self.original_pixmap:
+            self._update_thumbnail_scale()

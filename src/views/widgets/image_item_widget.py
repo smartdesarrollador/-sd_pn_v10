@@ -2,27 +2,38 @@
 """
 Widget especializado para items de imagen en el Visor de Proyectos/Áreas
 
-Layout (similar a ItemButton):
-- Botón de ojo 👁️ (32x32px) a la izquierda para ver imagen completa
-- Título + Miniatura RESPONSIVE (ocupa todo el espacio disponible) en el centro
-- Botones de acción a la derecha: 📋 ✏️ ℹ️ (estilo ItemButton)
+Layout VERTICAL (distribución de arriba hacia abajo):
+┌─────────────────────────────────────────┐
+│  [👁️] [📋] [✏️] [ℹ️]    (barra superior) │
+├─────────────────────────────────────────┤
+│       Título del Item (centrado)        │
+├─────────────────────────────────────────┤
+│                                         │
+│       [Imagen Miniatura RESPONSIVE]     │
+│        (ocupa espacio restante)         │
+│                                         │
+├─────────────────────────────────────────┤
+│             ⇲ Redimensionable           │
+└─────────────────────────────────────────┘
 
 Características:
-- Miniatura clickeable para ver imagen en tamaño completo
-- Diseño CONSISTENTE con items normales (mismo borde, padding, border-radius)
+- DISEÑO VERTICAL: Todos los elementos apilados verticalmente
+- Barra superior: Botones de acción (👁️ 📋 ✏️ ℹ️) alineados a la derecha
+- Título: Centrado horizontalmente, fuente 12px bold
+- Miniatura: Clickeable, centrada, ocupa todo el espacio vertical disponible
+- Diseño CONSISTENTE con items normales (borde, padding, border-radius)
 - REDIMENSIONAMIENTO INTERACTIVO:
-  * Arrastra el borde inferior para cambiar altura (200px-600px)
+  * Arrastra el borde inferior para cambiar altura (250px-600px)
   * Cursor de resize (↕️) aparece automáticamente al pasar por borde inferior
   * Imagen se re-escala automáticamente en tiempo real
-  * Indicador visual "⇲ Redimensionable" en esquina inferior
+  * Indicador visual "⇲ Redimensionable" en esquina inferior derecha
 - Borde de 1px sólido (#444) con border-radius de 6px
 - Hover effect con borde verde (#00ff88)
-- Padding/margen mínimo en parte inferior para maximizar espacio de imagen
 - Resolución automática de rutas (files_base_path + IMAGENES + filename)
 - Señales compatibles con ItemGroupWidget
 
 Autor: Widget Sidebar Team
-Versión: 4.0
+Versión: 5.0
 Fecha: 2026-01-01
 """
 
@@ -190,10 +201,10 @@ class ImageItemWidget(QFrame):
         return content
 
     def _setup_ui(self):
-        """Configurar interfaz del widget - Diseño similar a ItemButton"""
+        """Configurar interfaz del widget - Diseño VERTICAL"""
         # Frame properties (altura dinámica y redimensionable)
-        self.setMinimumHeight(200)  # Altura mínima aumentada
-        self.setMaximumHeight(600)  # Altura máxima para evitar que crezca demasiado
+        self.setMinimumHeight(250)  # Altura mínima para diseño vertical
+        self.setMaximumHeight(600)  # Altura máxima
         self.setMinimumWidth(400)   # Ancho mínimo igual a items normales
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -204,14 +215,22 @@ class ImageItemWidget(QFrame):
             QSizePolicy.Policy.Expanding  # Permite expansión vertical
         )
 
-        # Layout principal horizontal
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(12, 12, 12, 12)
-        main_layout.setSpacing(12)
+        # ===== LAYOUT PRINCIPAL VERTICAL =====
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
 
-        # ==== BOTÓN DE OJO (IZQUIERDA) ====
+        # ===== BARRA SUPERIOR: BOTONES DE ACCIÓN (DERECHA) =====
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.setSpacing(6)
+        top_bar_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Spacer para empujar botones a la derecha
+        top_bar_layout.addStretch()
+
+        # Botón de ojo (ver imagen completa)
         self.view_btn = QPushButton("👁️")
-        self.view_btn.setFixedSize(32, 32)
+        self.view_btn.setFixedSize(28, 28)
         self.view_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.view_btn.setToolTip("Ver imagen en tamaño completo")
         self.view_btn.setStyleSheet("""
@@ -220,7 +239,7 @@ class ImageItemWidget(QFrame):
                 color: #ffffff;
                 border: none;
                 border-radius: 4px;
-                font-size: 14pt;
+                font-size: 12pt;
                 padding: 0px;
             }
             QPushButton:hover {
@@ -231,31 +250,43 @@ class ImageItemWidget(QFrame):
             }
         """)
         self.view_btn.clicked.connect(self._on_thumbnail_clicked)
-        main_layout.addWidget(self.view_btn, alignment=Qt.AlignmentFlag.AlignTop)
+        top_bar_layout.addWidget(self.view_btn)
 
-        # ==== CONTENIDO CENTRAL (TÍTULO + MINIATURA) ====
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(6)
-        content_layout.setContentsMargins(0, 0, 0, 0)
+        # Copiar ruta
+        self.copy_btn = self._create_action_button("📋", "Copiar ruta de imagen")
+        self.copy_btn.clicked.connect(self._on_copy_clicked)
+        top_bar_layout.addWidget(self.copy_btn)
 
-        # Título del item
+        # Editar
+        self.edit_btn = self._create_action_button("✏️", "Editar")
+        self.edit_btn.clicked.connect(self.edit_clicked.emit)
+        top_bar_layout.addWidget(self.edit_btn)
+
+        # Detalles (info)
+        self.detail_btn = self._create_action_button("ℹ️", "Ver detalles")
+        self.detail_btn.clicked.connect(self.detail_clicked.emit)
+        top_bar_layout.addWidget(self.detail_btn)
+
+        main_layout.addLayout(top_bar_layout)
+
+        # ===== LABEL DEL TÍTULO (CENTRADO) =====
         label_text = self.item_data.get('label', 'Sin título')
         self.title_label = QLabel(label_text)
-        self.title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        self.title_label.setStyleSheet("color: #ffffff; background: transparent;")
+        self.title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.title_label.setStyleSheet("color: #ffffff; background: transparent; padding: 4px 0;")
         self.title_label.setWordWrap(True)
-        content_layout.addWidget(self.title_label)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centrado horizontal
+        main_layout.addWidget(self.title_label)
 
-        # Miniatura clickeable (redimensionable, crece con el contenedor)
+        # ===== IMAGEN MINIATURA (CENTRADA, OCUPA ESPACIO RESTANTE) =====
         self.thumbnail_label = QLabel()
-        self.thumbnail_label.setMinimumSize(150, 100)  # Altura mínima reducida
+        self.thumbnail_label.setMinimumSize(150, 120)  # Tamaño mínimo
         self.thumbnail_label.setScaledContents(False)  # Mantener aspect ratio
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumbnail_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.thumbnail_label.setToolTip("Clic para ver imagen completa. Arrastra el borde inferior para redimensionar.")
 
-        # Size policy para permitir crecimiento vertical y horizontal
-        from PyQt6.QtWidgets import QSizePolicy
+        # Size policy para permitir crecimiento
         self.thumbnail_label.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding  # Ocupa todo el espacio vertical disponible
@@ -274,19 +305,20 @@ class ImageItemWidget(QFrame):
         # Hacer clickeable
         self.thumbnail_label.mousePressEvent = lambda event: self._on_thumbnail_clicked()
 
-        # Agregar miniatura con stretch=1 para que ocupe todo el espacio disponible
-        content_layout.addWidget(self.thumbnail_label, stretch=1)
+        # Agregar miniatura con stretch=1 para que ocupe el espacio restante
+        main_layout.addWidget(self.thumbnail_label, stretch=1)
 
-        # Descripción (si existe)
+        # ===== DESCRIPCIÓN (SI EXISTE) =====
         description = self.item_data.get('description', '')
         if description:
             desc_label = QLabel(description)
             desc_label.setFont(QFont("Segoe UI", 9))
             desc_label.setStyleSheet("color: #888; background: transparent; padding: 2px 0;")
             desc_label.setWordWrap(True)
-            content_layout.addWidget(desc_label)
+            desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            main_layout.addWidget(desc_label)
 
-        # Indicador visual de redimensionamiento (sin padding extra)
+        # ===== INDICADOR DE REDIMENSIONAMIENTO (DERECHA ABAJO) =====
         resize_indicator = QLabel("⇲ Redimensionable")
         resize_indicator.setFont(QFont("Segoe UI", 7))
         resize_indicator.setStyleSheet("""
@@ -297,44 +329,7 @@ class ImageItemWidget(QFrame):
         """)
         resize_indicator.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
         resize_indicator.setToolTip("Arrastra el borde inferior para cambiar la altura")
-        content_layout.addWidget(resize_indicator)
-
-        # NO agregar stretch al final - la imagen debe ocupar todo el espacio
-        main_layout.addLayout(content_layout, stretch=1)
-
-        # Spacer para empujar botones a la derecha
-        main_layout.addStretch()
-
-        # ==== BOTONES DE ACCIÓN (DERECHA ARRIBA) - Similar a ItemButton ====
-        # Layout vertical para alinear botones arriba
-        buttons_container = QVBoxLayout()
-        buttons_container.setSpacing(0)
-
-        # Fila horizontal de botones
-        buttons_row = QHBoxLayout()
-        buttons_row.setSpacing(4)
-
-        # Copiar ruta
-        self.copy_btn = self._create_action_button("📋", "Copiar ruta de imagen")
-        self.copy_btn.clicked.connect(self._on_copy_clicked)
-        buttons_row.addWidget(self.copy_btn)
-
-        # Editar
-        self.edit_btn = self._create_action_button("✏️", "Editar")
-        self.edit_btn.clicked.connect(self.edit_clicked.emit)
-        buttons_row.addWidget(self.edit_btn)
-
-        # Detalles (info)
-        self.detail_btn = self._create_action_button("ℹ️", "Ver detalles")
-        self.detail_btn.clicked.connect(self.detail_clicked.emit)
-        buttons_row.addWidget(self.detail_btn)
-
-        # Agregar fila de botones al contenedor vertical
-        buttons_container.addLayout(buttons_row)
-        # Stretch para empujar botones hacia arriba
-        buttons_container.addStretch()
-
-        main_layout.addLayout(buttons_container)
+        main_layout.addWidget(resize_indicator)
 
     def _create_action_button(self, text: str, tooltip: str) -> QPushButton:
         """

@@ -4,21 +4,25 @@ Widget especializado para items de imagen en el Visor de Proyectos/Áreas
 
 Layout (similar a ItemButton):
 - Botón de ojo 👁️ (32x32px) a la izquierda para ver imagen completa
-- Título + Miniatura (150x150px min, 500x500px max) en el centro (layout vertical)
+- Título + Miniatura RESPONSIVE (ocupa todo el espacio disponible) en el centro
 - Botones de acción a la derecha: 📋 ✏️ ℹ️ (estilo ItemButton)
 
 Características:
 - Miniatura clickeable para ver imagen en tamaño completo
 - Diseño CONSISTENTE con items normales (mismo borde, padding, border-radius)
-- Contenedor REDIMENSIONABLE en altura (200px-600px) con indicador visual
+- REDIMENSIONAMIENTO INTERACTIVO:
+  * Arrastra el borde inferior para cambiar altura (200px-600px)
+  * Cursor de resize (↕️) aparece automáticamente al pasar por borde inferior
+  * Imagen se re-escala automáticamente en tiempo real
+  * Indicador visual "⇲ Redimensionable" en esquina inferior
 - Borde de 1px sólido (#444) con border-radius de 6px
 - Hover effect con borde verde (#00ff88)
+- Padding/margen mínimo en parte inferior para maximizar espacio de imagen
 - Resolución automática de rutas (files_base_path + IMAGENES + filename)
 - Señales compatibles con ItemGroupWidget
-- Re-escalado automático de miniatura al redimensionar
 
 Autor: Widget Sidebar Team
-Versión: 3.0
+Versión: 4.0
 Fecha: 2026-01-01
 """
 
@@ -79,6 +83,12 @@ class ImageItemWidget(QFrame):
         self.db = db_manager
         self.original_pixmap = None  # Guardar pixmap original para re-escalar
 
+        # Variables para redimensionamiento interactivo
+        self._is_resizing = False
+        self._resize_start_y = 0
+        self._resize_start_height = 0
+        self._resize_margin = 10  # Margen en px para detectar borde inferior
+
         # Logging para debug
         logger.info(f"=== ImageItemWidget.__init__ ===")
         logger.info(f"  item_data: {item_data}")
@@ -92,6 +102,9 @@ class ImageItemWidget(QFrame):
         self._setup_ui()
         self._apply_styles()
         self._load_thumbnail()
+
+        # Habilitar tracking del mouse para detectar hover en borde
+        self.setMouseTracking(True)
 
     def _get_full_image_path(self) -> str:
         """
@@ -222,7 +235,8 @@ class ImageItemWidget(QFrame):
 
         # ==== CONTENIDO CENTRAL (TÍTULO + MINIATURA) ====
         content_layout = QVBoxLayout()
-        content_layout.setSpacing(8)
+        content_layout.setSpacing(6)
+        content_layout.setContentsMargins(0, 0, 0, 0)
 
         # Título del item
         label_text = self.item_data.get('label', 'Sin título')
@@ -232,20 +246,19 @@ class ImageItemWidget(QFrame):
         self.title_label.setWordWrap(True)
         content_layout.addWidget(self.title_label)
 
-        # Miniatura clickeable (redimensionable, min 150x150, max 500x500)
+        # Miniatura clickeable (redimensionable, crece con el contenedor)
         self.thumbnail_label = QLabel()
-        self.thumbnail_label.setMinimumSize(150, 150)
-        self.thumbnail_label.setMaximumSize(500, 500)
+        self.thumbnail_label.setMinimumSize(150, 100)  # Altura mínima reducida
         self.thumbnail_label.setScaledContents(False)  # Mantener aspect ratio
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumbnail_label.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.thumbnail_label.setToolTip("Clic para ver imagen completa. Arrastra el borde del contenedor para redimensionar.")
+        self.thumbnail_label.setToolTip("Clic para ver imagen completa. Arrastra el borde inferior para redimensionar.")
 
-        # Size policy para permitir crecimiento
+        # Size policy para permitir crecimiento vertical y horizontal
         from PyQt6.QtWidgets import QSizePolicy
         self.thumbnail_label.setSizePolicy(
             QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Expanding  # Ocupa todo el espacio vertical disponible
         )
 
         self.thumbnail_label.setStyleSheet("""
@@ -261,32 +274,32 @@ class ImageItemWidget(QFrame):
         # Hacer clickeable
         self.thumbnail_label.mousePressEvent = lambda event: self._on_thumbnail_clicked()
 
-        # Centrar la miniatura horizontalmente
-        content_layout.addWidget(self.thumbnail_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+        # Agregar miniatura con stretch=1 para que ocupe todo el espacio disponible
+        content_layout.addWidget(self.thumbnail_label, stretch=1)
 
         # Descripción (si existe)
         description = self.item_data.get('description', '')
         if description:
             desc_label = QLabel(description)
             desc_label.setFont(QFont("Segoe UI", 9))
-            desc_label.setStyleSheet("color: #888; background: transparent;")
+            desc_label.setStyleSheet("color: #888; background: transparent; padding: 2px 0;")
             desc_label.setWordWrap(True)
             content_layout.addWidget(desc_label)
 
-        # Indicador visual de redimensionamiento (esquina inferior derecha)
+        # Indicador visual de redimensionamiento (sin padding extra)
         resize_indicator = QLabel("⇲ Redimensionable")
-        resize_indicator.setFont(QFont("Segoe UI", 8))
+        resize_indicator.setFont(QFont("Segoe UI", 7))
         resize_indicator.setStyleSheet("""
-            color: #666;
+            color: #555;
             background: transparent;
-            padding: 4px 8px;
+            padding: 2px 4px;
             font-style: italic;
         """)
         resize_indicator.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
-        resize_indicator.setToolTip("Arrastra el borde del contenedor para cambiar la altura de la miniatura")
+        resize_indicator.setToolTip("Arrastra el borde inferior para cambiar la altura")
         content_layout.addWidget(resize_indicator)
 
-        content_layout.addStretch()
+        # NO agregar stretch al final - la imagen debe ocupar todo el espacio
         main_layout.addLayout(content_layout, stretch=1)
 
         # Spacer para empujar botones a la derecha
@@ -526,3 +539,65 @@ class ImageItemWidget(QFrame):
         # Re-escalar miniatura cuando cambia el tamaño del widget
         if hasattr(self, 'original_pixmap') and self.original_pixmap:
             self._update_thumbnail_scale()
+
+    def mouseMoveEvent(self, event):
+        """
+        Detectar movimiento del mouse para cambiar cursor en borde inferior
+        y realizar redimensionamiento si está activo
+        """
+        # Si estamos redimensionando, ajustar altura
+        if self._is_resizing:
+            # Calcular nueva altura
+            delta_y = event.pos().y() - self._resize_start_y
+            new_height = self._resize_start_height + delta_y
+
+            # Aplicar límites (min 200px, max 600px)
+            new_height = max(200, min(600, new_height))
+
+            # Establecer nueva altura
+            self.setFixedHeight(new_height)
+
+            logger.debug(f"Redimensionando: altura={new_height}px")
+            event.accept()
+            return
+
+        # Si no estamos redimensionando, detectar si el mouse está cerca del borde inferior
+        widget_height = self.height()
+        mouse_y = event.pos().y()
+
+        # Si el mouse está dentro del margen inferior (últimos 10px)
+        if widget_height - mouse_y <= self._resize_margin:
+            # Cambiar cursor a flechas verticales
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            # Restaurar cursor normal
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Detectar clic en borde inferior para iniciar redimensionamiento"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            widget_height = self.height()
+            mouse_y = event.pos().y()
+
+            # Si el clic es en el borde inferior
+            if widget_height - mouse_y <= self._resize_margin:
+                self._is_resizing = True
+                self._resize_start_y = event.pos().y()
+                self._resize_start_height = self.height()
+                event.accept()
+                logger.info(f"Iniciando redimensionamiento desde altura={self.height()}px")
+                return
+
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Finalizar redimensionamiento"""
+        if event.button() == Qt.MouseButton.LeftButton and self._is_resizing:
+            self._is_resizing = False
+            logger.info(f"Redimensionamiento finalizado: altura={self.height()}px")
+            event.accept()
+            return
+
+        super().mouseReleaseEvent(event)

@@ -1379,6 +1379,10 @@ class ProjectAreaViewerPanel(QWidget):
                     capture_callback = lambda checked=False, ln=lista_name, gw=group_widget: self._on_capture_screenshot_from_group(ln, gw)
                     group_widget.capture_screenshot_clicked.connect(capture_callback)
 
+                    # Conectar señal de eliminación de item (✨ NUEVO)
+                    delete_callback = lambda item_id: self._on_item_deleted(item_id)
+                    group_widget.item_deleted.connect(delete_callback)
+
                 # Agregar items al grupo
                 for item_data in group['items']:
                     group_widget.add_item(item_data)
@@ -1989,6 +1993,36 @@ class ProjectAreaViewerPanel(QWidget):
         except Exception as e:
             logger.error(f"Error guardando item de screenshot en BD: {e}", exc_info=True)
             return None
+
+    def _on_item_deleted(self, item_id: int):
+        """
+        Callback cuando se elimina un item desde un grupo
+
+        Refresca el visor para actualizar la vista sin el item eliminado
+
+        Args:
+            item_id: ID del item eliminado
+        """
+        try:
+            logger.info(f"🗑️ Item {item_id} eliminado, refrescando visor...")
+
+            # Recargar datos del proyecto/área
+            if self.current_project_id:
+                self.project_data = self.data_manager.get_project_full_data(self.current_project_id)
+                logger.info(f"✅ Datos del proyecto {self.current_project_id} recargados")
+            elif self.current_area_id:
+                self.project_data = self.data_manager.get_area_full_data(self.current_area_id)
+                logger.info(f"✅ Datos del área {self.current_area_id} recargados")
+            else:
+                logger.warning("⚠️ No hay proyecto ni área seleccionado")
+                return
+
+            # Re-renderizar vista
+            self.render_view()
+            logger.info("✅ Visor refrescado después de eliminar item")
+
+        except Exception as e:
+            logger.error(f"❌ Error refrescando visor después de eliminar item: {e}", exc_info=True)
 
     def _on_screenshot_item_saved_success(self, item_id: int):
         """

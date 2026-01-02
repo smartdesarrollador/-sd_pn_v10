@@ -8,11 +8,14 @@ Autor: Widget Sidebar Team
 Versión: 1.2
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QMessageBox
 from PyQt6.QtCore import Qt, pyqtSignal
 from .headers.group_header import GroupHeaderWidget
 from .items import TextItemWidget, CodeItemWidget, URLItemWidget, PathItemWidget, WebStaticItemWidget
 from src.views.widgets.image_item_widget import ImageItemWidget
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ItemGroupWidget(QWidget):
@@ -34,6 +37,7 @@ class ItemGroupWidget(QWidget):
     create_list_clicked = pyqtSignal()
     add_item_clicked = pyqtSignal()
     capture_screenshot_clicked = pyqtSignal()  # Nueva señal para captura de pantalla
+    item_deleted = pyqtSignal(int)  # Emitida cuando se elimina un item (item_id)
 
     def __init__(self, group_name: str, group_type: str = "category", db_manager=None, parent=None):
         """
@@ -212,7 +216,7 @@ class ItemGroupWidget(QWidget):
                 item_widget.move_down_clicked.connect(lambda: print(f"TODO: Move down {item_data.get('label')}"))
                 item_widget.edit_clicked.connect(lambda: print(f"TODO: Edit {item_data.get('label')}"))
                 item_widget.detail_clicked.connect(lambda: print(f"TODO: Detail {item_data.get('label')}"))
-                item_widget.delete_clicked.connect(lambda: print(f"TODO: Delete {item_data.get('label')}"))
+                item_widget.delete_clicked.connect(lambda data=item_data: self._on_delete_image_item(data))
             else:
                 item_widget = PathItemWidget(item_data)
         elif item_type == 'WEB_STATIC':
@@ -276,6 +280,57 @@ class ItemGroupWidget(QWidget):
             print(f"❌ Error abriendo visor de imagen: {e}")
             import traceback
             traceback.print_exc()
+
+    def _on_delete_image_item(self, item_data: dict):
+        """
+        Manejar eliminación de item de imagen
+
+        Args:
+            item_data: Datos del item a eliminar
+        """
+        try:
+            item_id = item_data.get('id')
+            label = item_data.get('label', 'Sin título')
+
+            # Mostrar diálogo de confirmación
+            reply = QMessageBox.question(
+                self,
+                "Confirmar Eliminación",
+                f"¿Estás seguro de que deseas eliminar el item:\n\n'{label}'?\n\nEsta acción no se puede deshacer.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                # Eliminar de la base de datos
+                if self.db_manager:
+                    self.db_manager.delete_item(item_id)
+                    logger.info(f"✅ Item {item_id} ('{label}') eliminado de la BD")
+
+                    # Emitir señal para que el visor se refresque
+                    self.item_deleted.emit(item_id)
+
+                    # Mostrar mensaje de éxito
+                    QMessageBox.information(
+                        self,
+                        "Item Eliminado",
+                        f"El item '{label}' ha sido eliminado exitosamente."
+                    )
+                else:
+                    logger.error("No hay db_manager disponible para eliminar item")
+                    QMessageBox.critical(
+                        self,
+                        "Error",
+                        "No se pudo eliminar el item: no hay conexión a la base de datos."
+                    )
+
+        except Exception as e:
+            logger.error(f"❌ Error eliminando item de imagen: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo eliminar el item:\n{str(e)}"
+            )
 
     def clear_items(self):
         """Limpiar todos los items del grupo"""

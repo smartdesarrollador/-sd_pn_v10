@@ -2,10 +2,10 @@
 Widget contenedor de grupo de items
 
 Agrupa items bajo un encabezado de grupo (categoría, lista o tag).
-Para listas, incluye botones de "+ Agregar Item".
+Para listas, incluye botones de "📷 Captura" y "+ Agregar Item".
 
 Autor: Widget Sidebar Team
-Versión: 1.1
+Versión: 1.2
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
@@ -33,6 +33,7 @@ class ItemGroupWidget(QWidget):
     # Señales
     create_list_clicked = pyqtSignal()
     add_item_clicked = pyqtSignal()
+    capture_screenshot_clicked = pyqtSignal()  # Nueva señal para captura de pantalla
 
     def __init__(self, group_name: str, group_type: str = "category", db_manager=None, parent=None):
         """
@@ -99,6 +100,32 @@ class ItemGroupWidget(QWidget):
         toolbar_layout.addWidget(items_label)
 
         toolbar_layout.addStretch()
+
+        # Botón "📷 Captura" (nuevo - al lado izquierdo del botón Agregar Item)
+        capture_btn = QPushButton("📷 Captura")
+        capture_btn.setFixedHeight(28)
+        capture_btn.setMinimumWidth(100)
+        capture_btn.setToolTip("Tomar captura de pantalla y agregarla como item a esta lista")
+        capture_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        capture_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: #ffffff;
+                border: 1px solid #42A5F5;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: bold;
+                padding: 4px 10px;
+            }
+            QPushButton:hover {
+                background-color: #42A5F5;
+            }
+            QPushButton:pressed {
+                background-color: #1976D2;
+            }
+        """)
+        capture_btn.clicked.connect(self.capture_screenshot_clicked.emit)
+        toolbar_layout.addWidget(capture_btn)
 
         # Botón "+ Agregar Item"
         add_item_btn = QPushButton("+ Agregar Item")

@@ -2284,9 +2284,9 @@ class DBManager:
 
         Args:
             item_id: Item ID to update
-            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, favorite_order, tags, description, working_dir, color, badge, shortcut, is_active, is_archived, is_list, list_group, orden_lista, is_component, name_component, component_config, html_content, css_content, js_content, file_size, file_type, file_extension, original_filename, file_hash, preview_url, table_id, orden_table)
+            **kwargs: Fields to update (label, content, type, icon, is_sensitive, is_favorite, favorite_order, tags, description, working_dir, color, badge, shortcut, is_active, is_archived, is_list, list_id, list_group, orden_lista, is_component, name_component, component_config, html_content, css_content, js_content, file_size, file_type, file_extension, original_filename, file_hash, preview_url, table_id, orden_table)
         """
-        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'favorite_order', 'description', 'working_dir', 'color', 'badge', 'shortcut', 'is_active', 'is_archived', 'is_list', 'list_group', 'orden_lista', 'is_component', 'name_component', 'component_config', 'html_content', 'css_content', 'js_content', 'file_size', 'file_type', 'file_extension', 'original_filename', 'file_hash', 'preview_url', 'table_id', 'orden_table']
+        allowed_fields = ['label', 'content', 'type', 'icon', 'is_sensitive', 'is_favorite', 'favorite_order', 'description', 'working_dir', 'color', 'badge', 'shortcut', 'is_active', 'is_archived', 'is_list', 'list_id', 'list_group', 'orden_lista', 'is_component', 'name_component', 'component_config', 'html_content', 'css_content', 'js_content', 'file_size', 'file_type', 'file_extension', 'original_filename', 'file_hash', 'preview_url', 'table_id', 'orden_table']
         updates = []
         params = []
 

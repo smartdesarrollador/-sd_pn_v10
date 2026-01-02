@@ -93,18 +93,25 @@ class ProjectAreaViewerPanel(QWidget):
     item_copied = pyqtSignal(dict)  # Item copiado
     closed = pyqtSignal()  # Ventana cerrada
 
-    def __init__(self, db_manager, parent=None):
+    def __init__(self, db_manager, main_controller=None, parent=None):
         """
         Inicializa el Visor de Proyectos/Áreas
 
         Args:
             db_manager: Instancia de DBManager
+            main_controller: Instancia de MainController (opcional, para screenshot_controller)
             parent: Widget padre (generalmente el sidebar principal)
         """
         super().__init__(parent)
         self.db = db_manager
+        self.main_controller = main_controller
         self.appbar_registered = False  # Estado del AppBar
         self.drag_position = QPoint()  # Para dragging de ventana
+
+        # Screenshot controller (obtenido del main_controller)
+        self.screenshot_controller = None
+        if main_controller and hasattr(main_controller, 'screenshot_controller'):
+            self.screenshot_controller = main_controller.screenshot_controller
 
         # Data manager ✅ FASE 6
         self.data_manager = ProjectDataManager(db_manager)
@@ -116,6 +123,8 @@ class ProjectAreaViewerPanel(QWidget):
         # Diálogo de agregar item (✨ NUEVO)
         self.add_item_dialog = None
         self.current_lista_id = None  # Lista actualmente seleccionada para agregar items
+        self.current_lista_name = None  # Nombre de la lista actual (para capturas)
+        self._screenshot_category_id = None  # Categoría para screenshots
 
         # Estado interno
         self.current_project_id = None
@@ -1356,7 +1365,7 @@ class ProjectAreaViewerPanel(QWidget):
                 create_list_callback = lambda checked=False, tn=tag_name, tid=tag_id: self._on_create_list(tn, tid)
                 group_widget.create_list_clicked.connect(create_list_callback)
 
-                # Si es lista, conectar señal de agregar item
+                # Si es lista, conectar señales de agregar item y captura
                 if group['type'] == 'list':
                     # Necesitamos pasar el ID de la lista al callback
                     # Por ahora, asumimos que group['name'] es el nombre de la lista
@@ -1365,6 +1374,10 @@ class ProjectAreaViewerPanel(QWidget):
                     # Crear lambda con valores capturados
                     add_item_callback = lambda checked=False, ln=lista_name, gw=group_widget: self._on_add_item_from_group(ln, gw)
                     group_widget.add_item_clicked.connect(add_item_callback)
+
+                    # Conectar señal de captura de pantalla (✨ NUEVO)
+                    capture_callback = lambda checked=False, ln=lista_name, gw=group_widget: self._on_capture_screenshot_from_group(ln, gw)
+                    group_widget.capture_screenshot_clicked.connect(capture_callback)
 
                 # Agregar items al grupo
                 for item_data in group['items']:
@@ -1793,6 +1806,319 @@ class ProjectAreaViewerPanel(QWidget):
                 self,
                 "Error",
                 f"No se pudo encontrar la lista:\n{str(e)}"
+            )
+
+    def _on_capture_screenshot_from_group(self, lista_name: str, group_widget):
+        """
+        Callback para capturar pantalla desde un grupo de lista (✨ NUEVO)
+
+        Args:
+            lista_name: Nombre de la lista
+            group_widget: Widget del grupo
+        """
+        if not self.db:
+            QMessageBox.warning(self, "Error", "No hay conexión a la base de datos")
+            return
+
+        if not self.screenshot_controller:
+            QMessageBox.warning(
+                self,
+                "Función no disponible",
+                "El controlador de capturas no está disponible."
+            )
+            return
+
+        try:
+            # Buscar lista por nombre para obtener ID
+            lista_id = None
+            if group_widget.items:
+                first_item_id = group_widget.items[0].item_data.get('id')
+                if first_item_id:
+                    item = self.db.get_item(first_item_id)
+                    if item and item.get('list_id'):
+                        lista_id = item['list_id']
+
+            # Si no se pudo obtener el ID de los items, buscar en todas las listas
+            if not lista_id:
+                conn = self.db.connect()
+                cursor = conn.execute("SELECT id FROM listas WHERE name = ?", (lista_name,))
+                row = cursor.fetchone()
+                if row:
+                    lista_id = row['id']
+
+            if not lista_id:
+                QMessageBox.warning(
+                    self,
+                    "Lista no encontrada",
+                    f"No se encontró la lista '{lista_name}' en la base de datos."
+                )
+                return
+
+            # Obtener categoría de la lista
+            lista = self.db.get_lista(lista_id)
+            if not lista:
+                raise Exception(f"Lista {lista_id} no encontrada")
+
+            category_id = lista['category_id']
+
+            # Guardar contexto para el callback
+            self.current_lista_id = lista_id
+            self.current_lista_name = lista_name
+            self._screenshot_category_id = category_id
+
+            # Conectar señal de screenshot completado (solo una vez)
+            try:
+                self.screenshot_controller.screenshot_completed.disconnect()
+            except:
+                pass  # Si no estaba conectado, ignorar
+
+            self.screenshot_controller.screenshot_completed.connect(
+                self._on_screenshot_completed
+            )
+
+            # Iniciar captura de pantalla
+            logger.info(f"Iniciando captura de pantalla para lista '{lista_name}' (ID={lista_id})")
+            self.screenshot_controller.start_screenshot()
+
+        except Exception as e:
+            logger.error(f"Error iniciando captura: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo iniciar la captura:\n{str(e)}"
+            )
+
+    def _on_screenshot_completed(self, success: bool, filepath: str):
+        """
+        Callback cuando se completa la captura de pantalla (✨ NUEVO)
+
+        El screenshot_controller ya creó el item en BD con su propio diálogo.
+        Solo necesitamos asociarlo a la lista actual y refrescar el visor.
+
+        Args:
+            success: True si la captura fue exitosa
+            filepath: Ruta completa al archivo de captura
+        """
+        # Desconectar la señal
+        try:
+            self.screenshot_controller.screenshot_completed.disconnect(self._on_screenshot_completed)
+        except:
+            pass
+
+        if not success or not filepath:
+            logger.warning("Screenshot capture failed or cancelled")
+            return
+
+        logger.info(f"Screenshot completed: {filepath}")
+
+        try:
+            # El screenshot_controller ya creó el item con su diálogo
+            # Buscar el item recién creado por filepath
+            filename = filepath.split('\\')[-1]  # Extraer nombre de archivo
+
+            # Buscar item con este content (filename)
+            conn = self.db.connect()
+            cursor = conn.execute("""
+                SELECT id FROM items
+                WHERE content = ?
+                AND type = 'PATH'
+                ORDER BY id DESC
+                LIMIT 1
+            """, (filename,))
+
+            row = cursor.fetchone()
+
+            if row:
+                item_id = row['id']
+                logger.info(f"✅ Item de screenshot encontrado: ID={item_id}")
+
+                # Asociar a la lista actual y refrescar
+                self._on_screenshot_item_saved_success(item_id)
+            else:
+                logger.warning(f"⚠️ No se encontró item para screenshot: {filename}")
+                logger.info("Nota: El usuario pudo haber cancelado el diálogo o elegido 'No guardar item'")
+
+        except Exception as e:
+            logger.error(f"Error procesando screenshot completado: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo procesar el screenshot:\n{str(e)}"
+            )
+
+    def _save_screenshot_item_to_db(self, item_data: dict, filepath: str) -> Optional[int]:
+        """
+        Guardar item de screenshot en la base de datos
+
+        Args:
+            item_data: Datos del item del diálogo {category_id, label, content, description, tags, is_sensitive}
+            filepath: Ruta completa del archivo de screenshot
+
+        Returns:
+            ID del item creado o None si hubo error
+        """
+        try:
+            # Extraer datos del diálogo
+            category_id = item_data.get('category_id')
+            label = item_data.get('label', '')
+            content = item_data.get('content', '')  # Nombre del archivo (ej: "screenshot_20250101_123456.png")
+            description = item_data.get('description', '')
+            tags = item_data.get('tags', [])
+            is_sensitive = item_data.get('is_sensitive', False)
+
+            # Validar datos requeridos
+            if not category_id or not label or not content:
+                logger.error("Faltan datos requeridos para crear el item")
+                return None
+
+            # Crear item en BD (tipo PATH para imágenes)
+            item_id = self.db.add_item(
+                category_id=category_id,
+                label=label,
+                content=content,
+                item_type='PATH',
+                description=description,
+                is_sensitive=is_sensitive,
+                tags=tags,
+                list_id=None  # Se asociará después
+            )
+
+            logger.info(f"✅ Item de screenshot creado: ID={item_id}, label='{label}', content='{content}'")
+            return item_id
+
+        except Exception as e:
+            logger.error(f"Error guardando item de screenshot en BD: {e}", exc_info=True)
+            return None
+
+    def _on_screenshot_item_saved_success(self, item_id: int):
+        """
+        Callback después de guardar exitosamente el item de screenshot
+
+        Asocia el item a la lista actual, agrega tags, y refresca el visor
+
+        Args:
+            item_id: ID del item guardado
+        """
+        try:
+            logger.info(f"🔄 Iniciando procesamiento de screenshot guardado - Item ID: {item_id}")
+            logger.info(f"📋 Estado actual: project_id={self.current_project_id}, area_id={self.current_area_id}, lista_id={self.current_lista_id}")
+
+            # 1. Asociar item a la lista actual
+            if self.current_lista_id:
+                self.db.update_item(
+                    item_id=item_id,
+                    list_id=self.current_lista_id
+                )
+                logger.info(f"✅ Item {item_id} asociado a lista {self.current_lista_id}")
+            else:
+                logger.warning(f"⚠️ current_lista_id es None - item NO asociado a lista")
+
+            # 2. Agregar tag con el nombre de la lista si no existe
+            if self.current_lista_name:
+                try:
+                    self.db.add_tag_to_item(item_id, self.current_lista_name)
+                    logger.info(f"✅ Tag '{self.current_lista_name}' agregado al item {item_id}")
+                except Exception as e:
+                    logger.warning(f"⚠️ No se pudo agregar tag: {e}")
+            else:
+                logger.warning(f"⚠️ current_lista_name es None - tag NO agregado")
+
+            # 3. Recargar datos del área/proyecto para mostrar la nueva captura
+            logger.info(f"🔄 Recargando datos del proyecto/área...")
+            if self.current_project_id:
+                logger.info(f"📂 Recargando datos del proyecto {self.current_project_id}")
+                self.project_data = self.data_manager.get_project_full_data(self.current_project_id)
+                logger.info(f"✅ Datos del proyecto recargados")
+            elif self.current_area_id:
+                logger.info(f"📂 Recargando datos del área {self.current_area_id}")
+                self.project_data = self.data_manager.get_area_full_data(self.current_area_id)
+                logger.info(f"✅ Datos del área recargados")
+            else:
+                logger.warning(f"⚠️ No hay proyecto ni área seleccionado - NO se pueden recargar datos")
+
+            # 4. Re-renderizar vista
+            logger.info(f"🎨 Re-renderizando vista...")
+            self.render_view()
+            logger.info(f"✅ Vista re-renderizada")
+
+            # 5. Mensaje de éxito
+            logger.info(f"💬 Mostrando mensaje de éxito...")
+            QMessageBox.information(
+                self,
+                "Captura Guardada",
+                f"Captura agregada exitosamente a la lista '{self.current_lista_name}'."
+            )
+
+            logger.info(f"✅ Screenshot item guardado y agregado a la lista '{self.current_lista_name}'")
+
+        except Exception as e:
+            logger.error(f"❌ Error procesando item de screenshot guardado: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo procesar el item:\n{str(e)}"
+            )
+
+    def _on_screenshot_item_saved(self, item_data: dict, filepath: str):
+        """
+        Callback cuando se guarda el item de screenshot desde el diálogo (✨ NUEVO)
+
+        Args:
+            item_data: Datos del item guardado
+            filepath: Ruta del archivo de screenshot
+        """
+        try:
+            # El item ya fue guardado por el SaveScreenshotDialog
+            # Ahora necesitamos:
+            # 1. Asociar el item a la lista actual
+            # 2. Agregar tag con nombre de la lista
+            # 3. Refrescar el visor
+
+            item_id = item_data.get('id')
+            if not item_id:
+                logger.error("No se pudo obtener ID del item guardado")
+                return
+
+            # Asociar item a la lista
+            if self.current_lista_id:
+                self.db.update_item(
+                    item_id=item_id,
+                    list_id=self.current_lista_id
+                )
+                logger.info(f"Item {item_id} asociado a lista {self.current_lista_id}")
+
+            # Agregar tag con nombre de la lista si no existe
+            if self.current_lista_name:
+                try:
+                    self.db.add_tag_to_item(item_id, self.current_lista_name)
+                    logger.info(f"Tag '{self.current_lista_name}' agregado al item {item_id}")
+                except Exception as e:
+                    logger.warning(f"No se pudo agregar tag: {e}")
+
+            # Recargar datos del área/proyecto para mostrar la nueva captura
+            if self.current_project_id:
+                self.project_data = self.data_manager.get_project_full_data(self.current_project_id)
+            elif self.current_area_id:
+                self.project_data = self.data_manager.get_area_full_data(self.current_area_id)
+
+            # Re-renderizar vista
+            self.render_view()
+
+            # Mensaje de éxito
+            QMessageBox.information(
+                self,
+                "Captura Guardada",
+                f"Captura agregada exitosamente a la lista '{self.current_lista_name}'."
+            )
+
+            logger.info(f"✅ Screenshot item guardado y agregado a la lista")
+
+        except Exception as e:
+            logger.error(f"Error procesando item de screenshot: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo procesar el item:\n{str(e)}"
             )
 
     def _on_add_item_to_list(self, lista_id: int, lista_name: str):

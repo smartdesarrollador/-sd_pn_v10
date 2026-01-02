@@ -1062,6 +1062,7 @@ class MainWindow(QMainWindow):
                 # Create viewer panel (AppBar will be registered in showEvent)
                 self.project_area_viewer_panel = ProjectAreaViewerPanel(
                     db_manager=db_manager,
+                    main_controller=self.controller,  # Pass controller for screenshot functionality
                     parent=self  # Pass self (MainWindow) for relative positioning
                 )
 

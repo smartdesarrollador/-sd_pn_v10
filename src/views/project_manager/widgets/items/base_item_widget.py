@@ -15,6 +15,7 @@ from abc import abstractmethod
 import pyperclip
 import re
 import logging
+from src.core.encryption_manager import EncryptionManager
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +198,23 @@ class BaseItemWidget(QFrame):
 
         content = self.item_data.get('content', '')
         if content:
+            # Si el contenido está cifrado (y no fue descifrado por DBManager), intentar descifrar ahora
+            # Esto maneja el caso donde DBManager falló o devolvió el texto cifrado
+            encryption_manager = EncryptionManager()
+            if encryption_manager.is_encrypted(content):
+                try:
+                    content = encryption_manager.decrypt(content)
+                except Exception as e:
+                    logger.error(f"Error al descifrar contenido para copiar: {e}")
+                    # Si falla, avisar al usuario
+                    from PyQt6.QtWidgets import QMessageBox
+                    QMessageBox.warning(
+                        self,
+                        "Error de Descifrado",
+                        "No se pudo descifrar el contenido. Verifique su clave de encriptación."
+                    )
+                    return
+
             try:
                 pyperclip.copy(content)
                 self.item_copied.emit(self.item_data)

@@ -3254,7 +3254,8 @@ class DBManager:
                     item['content'] = self.encryption_manager.decrypt(item['content'])
                 except Exception as e:
                     logger.error(f"Error al descifrar item {item['id']}: {e}")
-                    item['content'] = '[ERROR: No se pudo descifrar]'
+                    # Mantener contenido cifrado original en lugar de sobreescribir con error
+                    # item['content'] = '[ERROR: No se pudo descifrar]'
 
         logger.debug(f"Obtenidos {len(results)} items de lista {lista_id}")
         return results

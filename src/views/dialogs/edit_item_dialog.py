@@ -24,7 +24,7 @@ Fecha: 2025-12-26
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QCheckBox, QPushButton, QMessageBox, QScrollArea,
-    QWidget, QFrame
+    QWidget, QFrame, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -161,6 +161,43 @@ class EditItemDialog(QDialog):
         label_layout.addWidget(self.label_input)
 
         form_layout.addWidget(label_container)
+
+        # === CAMPO TYPE ===
+        type_container = QWidget()
+        type_layout = QVBoxLayout(type_container)
+        type_layout.setContentsMargins(0, 0, 0, 0)
+        type_layout.setSpacing(5)
+
+        type_title = QLabel("📦 Type (Tipo)")
+        type_title.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        type_title.setStyleSheet("color: #ffffff;")
+        type_layout.addWidget(type_title)
+
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["TEXT", "CODE", "URL", "PATH"])
+        self.type_combo.setMinimumHeight(35)
+        self.type_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                border: 2px solid #444;
+                border-radius: 6px;
+                padding: 5px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #ffffff;
+                margin-right: 10px;
+            }
+        """)
+        type_layout.addWidget(self.type_combo)
+
+        form_layout.addWidget(type_container)
 
         # === CAMPO CONTENT ===
         content_container = QWidget()
@@ -324,6 +361,12 @@ class EditItemDialog(QDialog):
             # Cargar label
             self.label_input.setText(self.item_data.get('label', ''))
 
+            # Cargar tipo
+            current_type = self.item_data.get('type', 'TEXT')
+            index = self.type_combo.findText(current_type)
+            if index >= 0:
+                self.type_combo.setCurrentIndex(index)
+
             # Cargar content (descifrado si es sensible)
             content = self.item_data.get('content', '')
             self.content_input.setPlainText(content)
@@ -428,6 +471,7 @@ class EditItemDialog(QDialog):
             # Obtener valores del formulario
             new_label = self.label_input.text().strip()
             new_content = self.content_input.toPlainText().strip()
+            new_type = self.type_combo.currentText()
             new_is_sensitive = self.sensitive_checkbox.isChecked()
             new_tags = self.tag_selector.get_selected_tags()
 
@@ -435,6 +479,7 @@ class EditItemDialog(QDialog):
             update_data = {
                 'label': new_label,
                 'content': new_content,
+                'type': new_type,
                 'is_sensitive': new_is_sensitive,
                 'tags': new_tags
             }
@@ -450,6 +495,7 @@ class EditItemDialog(QDialog):
             updated_item_data.update({
                 'label': new_label,
                 'content': new_content,
+                'type': new_type,
                 'is_sensitive': new_is_sensitive,
                 'tags': new_tags
             })

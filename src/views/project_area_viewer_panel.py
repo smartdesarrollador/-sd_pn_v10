@@ -235,6 +235,13 @@ class ProjectAreaViewerPanel(QWidget):
         # Mostrar estado vacío inicial
         self._show_empty_state()
 
+        # Configurar botón Back to Top flotante
+        self._setup_back_to_top_button()
+
+        # Conectar señal de scroll para mostrar/ocultar botón
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._update_back_to_top_visibility)
+
+
     def _create_header(self) -> QWidget:
         """
         Crea el header compacto con barra de título arrastrable
@@ -328,6 +335,71 @@ class ProjectAreaViewerPanel(QWidget):
 
         return header
 
+    def _setup_back_to_top_button(self):
+        """Configura el botón flotante 'Back to Top'"""
+        self.back_to_top_btn = QPushButton("⬆️", self)
+        self.back_to_top_btn.setFixedSize(40, 40)
+        self.back_to_top_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.back_to_top_btn.setToolTip("Volver arriba")
+        self.back_to_top_btn.clicked.connect(self._scroll_to_top)
+        self.back_to_top_btn.hide()  # Oculto inicialmente
+        
+        # Estilo flotante (circular, sombra, siempre visible sobre contenido)
+        self.back_to_top_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00BFFF;
+                color: #ffffff;
+                border: none;
+                border-radius: 20px;
+                font-size: 18px;
+                font-weight: bold;
+                qproperty-iconSize: 20px 20px;
+            }
+            QPushButton:hover {
+                background-color: #33CCFF;
+                margin-top: -2px;
+            }
+            QPushButton:pressed {
+                background-color: #0099CC;
+                margin-top: 0px;
+            }
+        """)
+
+    def _update_back_to_top_visibility(self, value):
+        """
+        Muestra u oculta el botón basado en la posición del scroll
+        
+        Args:
+            value: Posición actual del scroll vertical
+        """
+        # Mostrar solo si se ha scrolleado más de 300px
+        if value > 300:
+            if not self.back_to_top_btn.isVisible():
+                self.back_to_top_btn.show()
+                self._update_back_to_top_position()
+        else:
+            if self.back_to_top_btn.isVisible():
+                self.back_to_top_btn.hide()
+
+    def _update_back_to_top_position(self):
+        """Posiciona el botón en la esquina inferior derecha"""
+        if hasattr(self, 'back_to_top_btn'):
+            # Margen desde la esquina inferior derecha
+            margin_right = 30
+            margin_bottom = 30
+            
+            x = self.width() - self.back_to_top_btn.width() - margin_right
+            y = self.height() - self.back_to_top_btn.height() - margin_bottom
+            
+            self.back_to_top_btn.move(x, y)
+            self.back_to_top_btn.raise_()
+
+    def resizeEvent(self, event):
+        """Manejar evento de redimensionamiento para reposicionar botón flotante"""
+        super().resizeEvent(event)
+        self._update_back_to_top_position()
+
+
     def _create_view_controls(self) -> QWidget:
         """
         Crea la sección de controles de vista (Colapsar Todo, Buscar)
@@ -403,6 +475,8 @@ class ProjectAreaViewerPanel(QWidget):
             }
         """)
         layout.addWidget(self.search_btn)
+
+
 
         layout.addStretch()
 
@@ -792,6 +866,13 @@ class ProjectAreaViewerPanel(QWidget):
             self.current_result_index = -1
             self.search_bar.update_results(0, 0)
             logger.info("No se encontraron resultados")
+
+    def _scroll_to_top(self):
+        """
+        Scrollear al inicio del contenido
+        """
+        self.scroll_area.verticalScrollBar().setValue(0)
+        logger.debug("Scroll to top")
 
     def _search_in_layout(self, layout, search_text: str):
         """

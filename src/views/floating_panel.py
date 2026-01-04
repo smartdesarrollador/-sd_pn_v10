@@ -1000,7 +1000,28 @@ class FloatingPanel(QWidget, TaskbarMinimizableMixin):
             return
 
         try:
-            from PyQt6.QtWidgets import QApplication
+            from PyQt6.QtWidgets import QApplication, QMessageBox
+            from src.views.dialogs.master_password_dialog import MasterPasswordDialog
+
+            # ⚠️ SECURITY: Check if any item is sensitive
+            has_sensitive_items = any(hasattr(item, 'is_sensitive') and item.is_sensitive for item in self.visible_items)
+
+            if has_sensitive_items:
+                # Verify master password before copying
+                verified = MasterPasswordDialog.verify(
+                    title="Items Sensibles",
+                    message=f"Esta acción copiará {len(self.visible_items)} item(s), incluyendo items sensibles.\n\nIngresa tu contraseña maestra para continuar:",
+                    parent=self
+                )
+
+                if not verified:
+                    logger.warning("Access denied - master password verification failed for copy all")
+                    QMessageBox.warning(
+                        self,
+                        "Acceso Denegado",
+                        "No se puede copiar items sensibles sin verificar la contraseña maestra."
+                    )
+                    return
 
             # Collect all item contents
             all_contents = []

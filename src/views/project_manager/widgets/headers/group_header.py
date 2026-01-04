@@ -88,7 +88,11 @@ class GroupHeaderWidget(QFrame):
         if group_type == "category":
             self.title_label.setText(f"[ Categoría: {name} ]")
         elif group_type == "list":
-            self.title_label.setText(f"[ Lista: {name} ]")
+            # Limitar nombre a 20 caracteres con puntos suspensivos
+            display_name = name if len(name) <= 20 else f"{name[:20]}..."
+            self.title_label.setText(display_name)
+            # Agregar tooltip con el nombre completo
+            self.title_label.setToolTip(f"Lista: {name}")
             # Agregar botón de copiar nombre de lista
             self._add_copy_list_name_button()
             # Agregar botón "+" para crear lista

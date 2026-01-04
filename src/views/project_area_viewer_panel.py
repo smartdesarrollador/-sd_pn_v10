@@ -186,12 +186,12 @@ class ProjectAreaViewerPanel(QWidget):
                 border-radius: 6px;
             }
             QScrollBar::handle:vertical {
-                background-color: #555;
+                background-color: #2196F3;
                 border-radius: 6px;
                 min-height: 20px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: #666;
+                background-color: #42A5F5;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0px;

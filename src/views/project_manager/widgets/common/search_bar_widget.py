@@ -69,7 +69,7 @@ class SearchBarWidget(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar en vista completa...")
         self.search_input.setFixedHeight(30)
-        self.search_input.setMinimumWidth(250)
+        self.search_input.setMinimumWidth(200)  # Reducido 20% (250 → 200)
         self.search_input.textChanged.connect(self._on_text_changed)
         self.search_input.returnPressed.connect(self.next_result.emit)
         layout.addWidget(self.search_input)

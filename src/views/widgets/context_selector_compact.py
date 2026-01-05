@@ -20,13 +20,115 @@ Fecha: 2025-12-26
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QFrame, QPushButton
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QFrame, QPushButton,
+    QCompleter
 )
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, Qt, QObject, QEvent
 from PyQt6.QtGui import QFont
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class PopupPositionFilter(QObject):
+    """
+    Event filter para ajustar la posición del popup del completer
+    cuando se muestra, asegurando que esté dentro de los límites de la pantalla
+    """
+
+    def __init__(self, combo, completer=None, parent=None):
+        super().__init__(parent)
+        self.combo = combo
+        self.completer = completer
+        self.is_combo_view = completer is None
+        self._adjusting = False  # Bandera para prevenir loops infinitos
+
+    def eventFilter(self, obj, event):
+        """Filtra eventos del popup para ajustar su posición al mostrarse o moverse"""
+        event_type = event.type()
+
+        if not self._adjusting:
+            if event_type == QEvent.Type.Show:
+                # Cuando se muestra por primera vez, ajustar posición
+                self.adjust_popup_position(obj)
+            elif event_type == QEvent.Type.Move:
+                # Interceptar el movimiento y aplicar nuestra propia posición
+                self.adjust_popup_position(obj)
+                # CRÍTICO: Prevenir que el evento Move se propague para evitar
+                # que el popup se mueva a la posición incorrecta
+                return True
+            elif event_type == QEvent.Type.Resize:
+                # Al cambiar tamaño, reajustar posición
+                self.adjust_popup_position(obj)
+
+        return super().eventFilter(obj, event)
+
+    def adjust_popup_position(self, popup_widget):
+        """Ajusta la posición del popup para que esté dentro de la ventana"""
+        # Si es el popup del completer, obtenerlo del completer
+        if not self.is_combo_view and self.completer:
+            popup_widget = self.completer.popup()
+
+        if not popup_widget or not popup_widget.isVisible():
+            return
+
+        # Ajustar la posición inmediatamente
+        self._do_adjust_position(popup_widget)
+
+    def _do_adjust_position(self, popup_widget):
+        """Realiza el ajuste real de posición"""
+        from PyQt6.QtGui import QGuiApplication
+
+        if not popup_widget or not popup_widget.isVisible():
+            return
+
+        # Activar bandera para prevenir loops
+        self._adjusting = True
+
+        try:
+            # Obtener la geometría del combobox en coordenadas globales
+            combo_rect = self.combo.rect()
+            combo_bottom_left = self.combo.mapToGlobal(combo_rect.bottomLeft())
+            combo_bottom_right = self.combo.mapToGlobal(combo_rect.bottomRight())
+
+            # Obtener el ancho del popup
+            popup_width = popup_widget.width()
+            if popup_width < 100:
+                popup_width = max(popup_widget.sizeHint().width(), self.combo.width())
+
+            # Obtener la geometría de la pantalla donde está el widget
+            screen = QGuiApplication.screenAt(combo_bottom_left)
+            if screen:
+                screen_geometry = screen.availableGeometry()
+            else:
+                # Fallback: usar la pantalla principal
+                screen_geometry = QGuiApplication.primaryScreen().availableGeometry()
+
+            # Calcular posición X (alineado con el combo)
+            x_pos = combo_bottom_left.x()
+
+            # Si el popup se sale por la derecha, ajustarlo
+            if x_pos + popup_width > screen_geometry.right():
+                x_pos = combo_bottom_right.x() - popup_width
+
+            # Si aún se sale por la izquierda, alinearlo con el borde izquierdo de la pantalla
+            if x_pos < screen_geometry.left():
+                x_pos = screen_geometry.left()
+
+            # Posicionar el popup SOLO si es necesario (para evitar loops)
+            current_pos = popup_widget.pos()
+            new_pos_y = combo_bottom_left.y()
+
+            if current_pos.x() != x_pos or current_pos.y() != new_pos_y:
+                popup_widget.move(x_pos, new_pos_y)
+
+            # Ajustar ancho si es necesario
+            if popup_widget.width() < self.combo.width():
+                popup_widget.setMinimumWidth(self.combo.width())
+
+        finally:
+            # Desactivar bandera
+            self._adjusting = False
 
 
 class ContextSelectorCompact(QWidget):
@@ -131,6 +233,68 @@ class ContextSelectorCompact(QWidget):
         combo = QComboBox()
         combo.setPlaceholderText(placeholder)
         combo.setMinimumHeight(32)
+        combo.setEditable(True)
+        combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+
+        # Configurar autocompletado (Buscador)
+        completer = combo.completer()
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+
+        # Estilizar el popup del autocompletado para que coincida con el tema
+        popup = completer.popup()
+        popup.setStyleSheet("""
+            QAbstractItemView {
+                background-color: #3d3d3d;
+                color: #ffffff;
+                selection-background-color: #00BFFF;
+                selection-color: #ffffff;
+                border: 1px solid #555;
+                outline: 0;
+            }
+            QAbstractItemView::item:hover {
+                background-color: #4d4d4d;
+                color: #00BFFF;
+            }
+        """)
+
+        # Configurar el popup del QComboBox para que se muestre correctamente
+        combo_view = combo.view()
+        combo_view.setStyleSheet("""
+            QAbstractItemView {
+                background-color: #3d3d3d;
+                color: #ffffff;
+                selection-background-color: #00BFFF;
+                selection-color: #ffffff;
+                border: 1px solid #555;
+                outline: 0;
+            }
+            QAbstractItemView::item {
+                padding: 5px;
+            }
+            QAbstractItemView::item:hover {
+                background-color: #4d4d4d;
+                color: #00BFFF;
+            }
+        """)
+
+        # Forzar que el popup se abra dentro de la ventana
+        combo_view.window().setWindowFlags(
+            combo_view.window().windowFlags() | Qt.WindowType.Popup
+        )
+
+        # Instalar event filter para ajustar posición del popup del completer
+        popup_filter_completer = PopupPositionFilter(combo, completer, combo)
+        completer.popup().installEventFilter(popup_filter_completer)
+
+        # Instalar event filter para el popup del QComboBox también
+        popup_filter_combo = PopupPositionFilter(combo, None, combo)
+        combo_view.window().installEventFilter(popup_filter_combo)
+
+        # Guardar referencias a los filters para evitar que sean recolectados por el GC
+        combo._popup_filter_completer = popup_filter_completer
+        combo._popup_filter_combo = popup_filter_combo
 
         # Botón "+" para crear
         create_btn = QPushButton("+")
@@ -210,7 +374,16 @@ class ContextSelectorCompact(QWidget):
                 color: #ffffff;
                 selection-background-color: #00BFFF;
                 selection-color: #ffffff;
+                selection-color: #ffffff;
                 border: 1px solid #555;
+            }
+
+            QComboBox QLineEdit {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                selection-background-color: #00BFFF;
+                selection-color: #ffffff;
             }
         """)
 

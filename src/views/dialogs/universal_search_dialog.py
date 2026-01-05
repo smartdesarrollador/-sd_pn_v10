@@ -344,7 +344,7 @@ class UniversalSearchDialog(QDialog):
         table = QTableWidget()
         table.setColumnCount(8)
 
-        headers = ["☐", "Nombre", "PROYECTO", "AREA", "TABLA", "PROCESO", "CATEGORIA", "LISTA"]
+        headers = ["☐", "Nombre", "LISTA", "CATEGORIA", "TABLA", "PROCESO", "PROYECTO", "AREA"]
         table.setHorizontalHeaderLabels(headers)
 
         # Configurar header
@@ -607,15 +607,17 @@ class UniversalSearchDialog(QDialog):
             icon = result.icon if result.icon else "📄"
             name_text = f"{icon} {result.name}"
             name_item = QTableWidgetItem(name_text)
+            # Guardar el ID del item como dato oculto para recuperarlo después
+            name_item.setData(Qt.ItemDataRole.UserRole, result.id)
             self.results_table.setItem(row, 1, name_item)
 
-            # Proyectos
-            proyectos_text = ", ".join(result.proyectos) if result.proyectos else ""
-            self.results_table.setItem(row, 2, QTableWidgetItem(proyectos_text))
+            # Lista
+            lista_text = result.lista if result.lista else ""
+            self.results_table.setItem(row, 2, QTableWidgetItem(lista_text))
 
-            # Areas
-            areas_text = ", ".join(result.areas) if result.areas else ""
-            self.results_table.setItem(row, 3, QTableWidgetItem(areas_text))
+            # Categoría
+            categoria_text = result.categoria if result.categoria else ""
+            self.results_table.setItem(row, 3, QTableWidgetItem(categoria_text))
 
             # Tabla
             tabla_text = result.tabla if result.tabla else ""
@@ -625,13 +627,13 @@ class UniversalSearchDialog(QDialog):
             procesos_text = ", ".join(result.procesos) if result.procesos else ""
             self.results_table.setItem(row, 5, QTableWidgetItem(procesos_text))
 
-            # Categoría
-            categoria_text = result.categoria if result.categoria else ""
-            self.results_table.setItem(row, 6, QTableWidgetItem(categoria_text))
+            # Proyectos
+            proyectos_text = ", ".join(result.proyectos) if result.proyectos else ""
+            self.results_table.setItem(row, 6, QTableWidgetItem(proyectos_text))
 
-            # Lista
-            lista_text = result.lista if result.lista else ""
-            self.results_table.setItem(row, 7, QTableWidgetItem(lista_text))
+            # Areas
+            areas_text = ", ".join(result.areas) if result.areas else ""
+            self.results_table.setItem(row, 7, QTableWidgetItem(areas_text))
 
         self.results_table.setSortingEnabled(True)
 
@@ -860,9 +862,16 @@ class UniversalSearchDialog(QDialog):
 
         # Obtener la fila seleccionada
         row = self.results_table.currentRow()
-        if row >= 0 and row < len(self.current_results):
-            result = self.current_results[row]
-            self.update_preview(result)
+        if row >= 0:
+            # Obtener el ID del item almacenado en la columna "Nombre"
+            name_item = self.results_table.item(row, 1)
+            if name_item:
+                item_id = name_item.data(Qt.ItemDataRole.UserRole)
+                # Buscar el item correspondiente en current_results
+                for result in self.current_results:
+                    if result.id == item_id:
+                        self.update_preview(result)
+                        break
 
     def update_preview(self, result):
         """Actualiza el panel de preview con los detalles del item"""
@@ -1126,17 +1135,24 @@ class UniversalSearchDialog(QDialog):
 
     def on_cell_double_clicked(self, row, column):
         """Handler cuando se hace doble clic en una celda"""
-        if row >= 0 and row < len(self.current_results):
-            result = self.current_results[row]
-            if result.result_type == SearchResultType.ITEM:
-                # Copiar contenido al portapapeles
-                try:
-                    import pyperclip
-                    pyperclip.copy(result.content)
-                    logger.info(f"Item copiado: {result.name}")
-                    self.item_copied.emit(result.id)
-                except Exception as e:
-                    logger.error(f"Error copiando item: {e}")
+        if row >= 0:
+            # Obtener el ID del item almacenado en la columna "Nombre"
+            name_item = self.results_table.item(row, 1)
+            if name_item:
+                item_id = name_item.data(Qt.ItemDataRole.UserRole)
+                # Buscar el item correspondiente en current_results
+                for result in self.current_results:
+                    if result.id == item_id:
+                        if result.result_type == SearchResultType.ITEM:
+                            # Copiar contenido al portapapeles
+                            try:
+                                import pyperclip
+                                pyperclip.copy(result.content)
+                                logger.info(f"Item copiado: {result.name}")
+                                self.item_copied.emit(result.id)
+                            except Exception as e:
+                                logger.error(f"Error copiando item: {e}")
+                        break
 
     def show_loading(self):
         """Muestra el indicador de carga"""
@@ -1457,10 +1473,24 @@ Busca la frase exacta.<br>
         """Muestra el menú contextual en la tabla"""
         # Obtener la fila clickeada
         row = self.results_table.rowAt(position.y())
-        if row < 0 or row >= len(self.current_results):
+        if row < 0:
             return
 
-        result = self.current_results[row]
+        # Obtener el ID del item almacenado en la columna "Nombre"
+        name_item = self.results_table.item(row, 1)
+        if not name_item:
+            return
+
+        item_id = name_item.data(Qt.ItemDataRole.UserRole)
+        # Buscar el item correspondiente en current_results
+        result = None
+        for res in self.current_results:
+            if res.id == item_id:
+                result = res
+                break
+
+        if not result:
+            return
 
         # Crear menú
         menu = QMenu(self)
@@ -1552,9 +1582,16 @@ Busca la frase exacta.<br>
                 cb_widget = self.results_table.cellWidget(row, 0)
                 if cb_widget:
                     cb = cb_widget.findChild(QCheckBox)
-                    if cb and cb.isChecked() and row < len(self.current_results):
-                        result = self.current_results[row]
-                        selected_contents.append(result.content)
+                    if cb and cb.isChecked():
+                        # Obtener el ID del item almacenado en la columna "Nombre"
+                        name_item = self.results_table.item(row, 1)
+                        if name_item:
+                            item_id = name_item.data(Qt.ItemDataRole.UserRole)
+                            # Buscar el item correspondiente en current_results
+                            for result in self.current_results:
+                                if result.id == item_id:
+                                    selected_contents.append(result.content)
+                                    break
 
             if selected_contents:
                 combined_content = "\n".join(selected_contents)
@@ -1842,9 +1879,13 @@ Busca la frase exacta.<br>
                 cb_widget = self.results_table.cellWidget(row, 0)
                 if cb_widget:
                     cb = cb_widget.findChild(QCheckBox)
-                    if cb and cb.isChecked() and row < len(self.current_results):
-                        result = self.current_results[row]
-                        selected_ids.append(result.id)
+                    if cb and cb.isChecked():
+                        # Obtener el ID del item almacenado en la columna "Nombre"
+                        name_item = self.results_table.item(row, 1)
+                        if name_item:
+                            item_id = name_item.data(Qt.ItemDataRole.UserRole)
+                            if item_id:
+                                selected_ids.append(item_id)
 
             if not selected_ids:
                 QMessageBox.information(self, "Marcar Favoritos", "No hay items seleccionados")
@@ -1889,10 +1930,17 @@ Busca la frase exacta.<br>
                 cb_widget = self.results_table.cellWidget(row, 0)
                 if cb_widget:
                     cb = cb_widget.findChild(QCheckBox)
-                    if cb and cb.isChecked() and row < len(self.current_results):
-                        result = self.current_results[row]
-                        selected_ids.append(result.id)
-                        selected_names.append(result.name)
+                    if cb and cb.isChecked():
+                        # Obtener el ID del item almacenado en la columna "Nombre"
+                        name_item = self.results_table.item(row, 1)
+                        if name_item:
+                            item_id = name_item.data(Qt.ItemDataRole.UserRole)
+                            # Buscar el item correspondiente en current_results
+                            for result in self.current_results:
+                                if result.id == item_id:
+                                    selected_ids.append(result.id)
+                                    selected_names.append(result.name)
+                                    break
 
             if not selected_ids:
                 QMessageBox.information(self, "Eliminar Items", "No hay items seleccionados")

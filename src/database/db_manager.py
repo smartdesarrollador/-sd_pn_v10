@@ -9362,13 +9362,27 @@ class DBManager:
                 """
                 try:
                     cursor.execute(query_sql, (search_query, limit, offset))
+                    # Verificar si hay resultados inmediatamente
+                    rows = cursor.fetchall()
+                    if rows:
+                        columns = [desc[0] for desc in cursor.description]
+                        results = []
+                        for row in rows:
+                            results.append(dict(zip(columns, row)))
+                        logger.debug(f"Universal search (FTS5) found {len(results)} items")
+                        return results
+                    
+                    # Si no hay resultados FTS, indicamos que continúe al fallback
+                    logger.debug("FTS5 search yielded 0 results, falling back to LIKE")
+                    
                 except sqlite3.OperationalError as e:
                     # Si hay error de sintaxis FTS5, hacer fallback a LIKE
                     logger.warning(f"FTS5 query error, fallback to LIKE: {e}")
                     has_fts = False  # Forzar uso de LIKE
 
-            if not has_fts or not query.strip():
-                # Fallback a búsqueda LIKE si no hay FTS5 o query vacío
+            # Si llegamos aquí, es porque FTS estaba deshabilitado, falló, o no dio resultados
+            # Ejecutar búsqueda LIKE (Fallback)
+            if query.strip():
                 search_pattern = f"%{query}%" if query.strip() else "%"
 
                 query_sql = """
@@ -9452,7 +9466,8 @@ class DBManager:
 
             if has_fts and query.strip():
                 # Usar FTS5 para búsqueda rápida
-                search_query = f'"{query}"*'
+                # Usar búsqueda sin comillas para permitir coincidencias parciales
+                search_query = f'{query}*'
 
                 query_sql = """
                 SELECT COUNT(DISTINCT i.id)

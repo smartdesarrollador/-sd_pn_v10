@@ -11,10 +11,11 @@ NOTA: El campo de nombre de lista fue movido a ListNameSection
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QPushButton, QLineEdit, QFrame
+    QPushButton, QLineEdit, QFrame, QCompleter
 )
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, Qt, QObject, QEvent
 from PyQt6.QtGui import QFont
+from src.views.widgets.context_selector_compact import PopupPositionFilter
 import logging
 
 logger = logging.getLogger(__name__)
@@ -63,10 +64,70 @@ class SelectorWithCreate(QWidget):
             self.label.setStyleSheet("color: #FF5252;")  # Rojo para requerido
         self.label.setFixedWidth(80)
 
-        # ComboBox
+        # ComboBox con búsqueda
         self.combo = QComboBox()
         self.combo.setPlaceholderText(placeholder)
         self.combo.setMinimumHeight(35)
+        self.combo.setEditable(True)
+        self.combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+
+        # Configurar autocompletado (Buscador)
+        completer = self.combo.completer()
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+
+        # Estilizar el popup del autocompletado
+        popup = completer.popup()
+        popup.setStyleSheet("""
+            QAbstractItemView {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                selection-background-color: #2196F3;
+                selection-color: #ffffff;
+                border: 1px solid #444;
+                outline: 0;
+            }
+            QAbstractItemView::item:hover {
+                background-color: #3d3d3d;
+                color: #2196F3;
+            }
+        """)
+
+        # Configurar el popup del QComboBox
+        combo_view = self.combo.view()
+        combo_view.setStyleSheet("""
+            QAbstractItemView {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                selection-background-color: #2196F3;
+                selection-color: #ffffff;
+                border: 1px solid #444;
+                outline: 0;
+            }
+            QAbstractItemView::item {
+                padding: 5px;
+            }
+            QAbstractItemView::item:hover {
+                background-color: #3d3d3d;
+                color: #2196F3;
+            }
+        """)
+
+        combo_view.window().setWindowFlags(
+            combo_view.window().windowFlags() | Qt.WindowType.Popup
+        )
+
+        # Instalar event filters para ajustar posición del popup
+        popup_filter_completer = PopupPositionFilter(self.combo, completer, self.combo)
+        completer.popup().installEventFilter(popup_filter_completer)
+
+        popup_filter_combo = PopupPositionFilter(self.combo, None, self.combo)
+        combo_view.window().installEventFilter(popup_filter_combo)
+
+        # Guardar referencias para evitar que sean recolectados por el GC
+        self.combo._popup_filter_completer = popup_filter_completer
+        self.combo._popup_filter_combo = popup_filter_combo
 
         # Botón crear
         self.create_btn = QPushButton("+")
@@ -112,6 +173,13 @@ class SelectorWithCreate(QWidget):
                 color: #ffffff;
                 selection-background-color: #2196F3;
                 border: 1px solid #444;
+            }
+            QComboBox QLineEdit {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                selection-background-color: #2196F3;
+                selection-color: #ffffff;
             }
             QPushButton {
                 background-color: #2196F3;
